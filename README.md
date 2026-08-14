@@ -186,3 +186,30 @@ Never change the Firestore rules to `allow read, write: if true`.
 - Corrected React Hook Form + Zod 4 input/output generics for Transactions, Debts, and Earnings forms.
 - Resolves the production TypeScript `handleSubmit` / resolver incompatibility errors.
 - Keeps numeric coercion and runtime validation intact.
+
+## Enterprise UI refresh — v2.1.0
+
+This version preserves the existing Firebase Authentication, Firestore, salary materialization,
+multi-currency conversion, debt tracking, and transaction behavior while replacing the original
+starter-style interface with a production-oriented application experience.
+
+### UI/UX upgrades
+
+- Dark enterprise navigation rail with responsive mobile drawer
+- Professional sticky account header and secured-workspace treatment
+- Redesigned login experience with a private-finance product presentation
+- Executive-style financial overview hero with net financial position
+- KPI cards for credits, debt portfolio, recorded expenses, and net position
+- Financial coverage indicator
+- Primary-vs-secondary portfolio chart
+- Refined category-spend visualization
+- Recent-activity panel
+- Portfolio snapshot cards
+- Centralized MUI enterprise theme for typography, controls, cards, dialogs, and spacing
+- Responsive desktop/tablet/mobile behavior
+- Existing functional pages automatically inherit the new theme and application shell
+
+### Merge notes
+
+Keep your existing `.env.local` locally. It is intentionally not included in this package.
+The Firebase configuration, Firestore rules, and GitHub workflows from the supplied project are retained.
