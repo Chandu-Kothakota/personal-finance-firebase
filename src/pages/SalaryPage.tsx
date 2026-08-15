@@ -26,7 +26,23 @@ import { useFinanceData } from "../hooks/useFinanceData";
 import { CURRENCIES, formatMoney } from "../lib/currency";
 import { toUserMessage } from "../lib/errors";
 import { saveSalaryProfile } from "../services/firestoreService";
+import { getSalaryPayDays } from "../services/salaryService";
 import type { SalaryProfile } from "../types";
+
+const requiredPayDay = z
+  .string()
+  .trim()
+  .regex(/^(?:[1-9]|[12]\d|3[01])$/, "Pay day must be between 1 and 31")
+  .transform(Number);
+
+const optionalPayDay = z
+  .string()
+  .trim()
+  .refine(
+    (value) => value === "" || /^(?:[1-9]|[12]\d|3[01])$/.test(value),
+    "Pay day must be between 1 and 31",
+  )
+  .transform((value) => (value === "" ? undefined : Number(value)));
 
 const schema = z.object({
   name: z.string().trim().min(1).max(80),
@@ -34,20 +50,28 @@ const schema = z.object({
   amount: z.coerce.number().positive(),
   currency: z.enum(CURRENCIES),
   effectiveDate: z.string().min(1),
-  payDay: z.coerce.number().int().min(1).max(28),
+  payDay1: requiredPayDay,
+  payDay2: optionalPayDay,
   active: z.boolean(),
-});
+}).refine(
+  (values) => values.payDay2 === undefined || values.payDay1 !== values.payDay2,
+  {
+    path: ["payDay2"],
+    message: "Pay day 2 must be different from pay day 1",
+  },
+);
 
 type FormInput = z.input<typeof schema>;
 type FormData = z.output<typeof schema>;
 
-const defaults: FormData = {
+const defaults: FormInput = {
   name: "Primary Salary",
   group: "primary",
   amount: 0,
   currency: "USD",
   effectiveDate: new Date().toISOString().slice(0, 10),
-  payDay: 15,
+  payDay1: "15",
+  payDay2: "30",
   active: true,
 };
 
@@ -67,6 +91,7 @@ export function SalaryPage() {
   }
 
   function edit(profile: SalaryProfile) {
+    const payDays = getSalaryPayDays(profile);
     setEditing(profile);
     form.reset({
       name: profile.name,
@@ -74,7 +99,8 @@ export function SalaryPage() {
       amount: profile.amount,
       currency: profile.currency,
       effectiveDate: profile.effectiveDate,
-      payDay: profile.payDay,
+      payDay1: String(payDays[0] ?? 15),
+      payDay2: payDays[1] === undefined ? "" : String(payDays[1]),
       active: profile.active,
     });
     setOpen(true);
@@ -84,7 +110,16 @@ export function SalaryPage() {
     if (!user) return;
     try {
       setError("");
-      await saveSalaryProfile(user.uid, values, editing?.id);
+      const { payDay1, payDay2, ...profile } = values;
+      await saveSalaryProfile(
+        user.uid,
+        {
+          ...profile,
+          payDays: payDay2 === undefined ? [payDay1] : [payDay1, payDay2],
+          payDay: payDay1,
+        },
+        editing?.id,
+      );
       setOpen(false);
       await data.refresh();
     } catch (err) {
@@ -107,36 +142,43 @@ export function SalaryPage() {
       </Stack>
 
       <Alert severity="info">
-        Default pay day is the 15th. The effective date controls when auto-crediting starts.
-        Editing the profile affects future missing occurrences; already-created salary entries remain editable in Transactions.
+        Configure one or two pay days from 1–31. Shorter months use their last valid day,
+        and credits are only created after each date arrives. Existing one-day profiles remain supported.
       </Alert>
 
       {error && <Alert severity="error">{error}</Alert>}
 
       <Grid container spacing={2}>
-        {data.salaryProfiles.map((profile) => (
-          <Grid key={profile.id} size={{ xs: 12, md: 6 }}>
-            <Card>
-              <CardContent>
-                <Stack direction="row" justifyContent="space-between">
-                  <Box>
-                    <Typography variant="h6" fontWeight={800}>{profile.name}</Typography>
-                    <Typography color="text.secondary" variant="body2">
-                      {profile.group} · every month on day {profile.payDay} · effective {profile.effectiveDate}
-                    </Typography>
-                  </Box>
-                  <IconButton onClick={() => edit(profile)}><EditRounded /></IconButton>
-                </Stack>
-                <Typography variant="h5" fontWeight={900} sx={{ mt: 2 }}>
-                  {formatMoney(profile.amount, profile.currency)}
-                </Typography>
-                <Typography variant="body2" color={profile.active ? "success.main" : "text.secondary"}>
-                  {profile.active ? "Active" : "Paused"}
-                </Typography>
-              </CardContent>
-            </Card>
-          </Grid>
-        ))}
+        {data.salaryProfiles.map((profile) => {
+          const payDays = getSalaryPayDays(profile);
+          const schedule = payDays.length === 2
+            ? `days ${payDays[0]} and ${payDays[1]}`
+            : `day ${payDays[0] ?? "not configured"}`;
+
+          return (
+            <Grid key={profile.id} size={{ xs: 12, md: 6 }}>
+              <Card>
+                <CardContent>
+                  <Stack direction="row" justifyContent="space-between">
+                    <Box>
+                      <Typography variant="h6" fontWeight={800}>{profile.name}</Typography>
+                      <Typography color="text.secondary" variant="body2">
+                        {profile.group} · every month on {schedule} · effective {profile.effectiveDate}
+                      </Typography>
+                    </Box>
+                    <IconButton onClick={() => edit(profile)}><EditRounded /></IconButton>
+                  </Stack>
+                  <Typography variant="h5" fontWeight={900} sx={{ mt: 2 }}>
+                    {formatMoney(profile.amount, profile.currency)}
+                  </Typography>
+                  <Typography variant="body2" color={profile.active ? "success.main" : "text.secondary"}>
+                    {profile.active ? "Active" : "Paused"}
+                  </Typography>
+                </CardContent>
+              </Card>
+            </Grid>
+          );
+        })}
       </Grid>
 
       <Dialog open={open} onClose={() => setOpen(false)} fullWidth maxWidth="sm">
@@ -166,9 +208,14 @@ export function SalaryPage() {
               <Controller name="effectiveDate" control={form.control} render={({ field, fieldState }) => (
                 <TextField {...field} type="date" label="Effective date" slotProps={{ inputLabel: { shrink: true } }} error={!!fieldState.error} helperText={fieldState.error?.message} />
               )} />
-              <Controller name="payDay" control={form.control} render={({ field, fieldState }) => (
-                <TextField {...field} type="number" label="Pay day" inputProps={{ min: 1, max: 28 }} error={!!fieldState.error} helperText={fieldState.error?.message} />
-              )} />
+              <Stack direction="row" spacing={2}>
+                <Controller name="payDay1" control={form.control} render={({ field, fieldState }) => (
+                  <TextField {...field} fullWidth type="number" label="Pay day 1" inputProps={{ min: 1, max: 31 }} error={!!fieldState.error} helperText={fieldState.error?.message} />
+                )} />
+                <Controller name="payDay2" control={form.control} render={({ field, fieldState }) => (
+                  <TextField {...field} fullWidth type="number" label="Pay day 2" inputProps={{ min: 1, max: 31 }} error={!!fieldState.error} helperText={fieldState.error?.message ?? "Optional for legacy monthly schedules"} />
+                )} />
+              </Stack>
               <Controller name="active" control={form.control} render={({ field }) => (
                 <Stack direction="row" alignItems="center" justifyContent="space-between">
                   <Typography>Active</Typography>
