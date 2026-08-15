@@ -20,19 +20,47 @@ import {
 import { db } from "../config/firebase";
 import type { SalaryProfile } from "../types";
 
-function occurrenceDates(profile: SalaryProfile, today: Date): Date[] {
+type SalaryOccurrence = {
+  date: Date;
+  index: number;
+};
+
+export function getSalaryPayDays(
+  profile: Pick<SalaryProfile, "payDay" | "payDays">,
+): number[] {
+  const configuredDays = profile.payDays?.length
+    ? profile.payDays
+    : profile.payDay !== undefined
+      ? [profile.payDay]
+      : [];
+
+  return configuredDays
+    .filter(
+      (day, index, days) =>
+        Number.isInteger(day) &&
+        day >= 1 &&
+        day <= 31 &&
+        days.indexOf(day) === index,
+    )
+    .slice(0, 2);
+}
+
+function occurrenceDates(profile: SalaryProfile, today: Date): SalaryOccurrence[] {
   const effective = parseISO(profile.effectiveDate);
+  const payDays = getSalaryPayDays(profile);
   let cursor = startOfMonth(effective);
-  const results: Date[] = [];
+  const results: SalaryOccurrence[] = [];
 
   while (!isAfter(cursor, today)) {
     const maxDay = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 0).getDate();
-    const payDate = setDate(cursor, Math.min(profile.payDay, maxDay));
 
-    const validStart = isAfter(payDate, effective) || isEqual(payDate, effective);
-    const validEnd = isBefore(payDate, today) || isEqual(payDate, today);
+    payDays.forEach((payDay, index) => {
+      const payDate = setDate(cursor, Math.min(payDay, maxDay));
+      const validStart = isAfter(payDate, effective) || isEqual(payDate, effective);
+      const validEnd = isBefore(payDate, today) || isEqual(payDate, today);
 
-    if (validStart && validEnd) results.push(payDate);
+      if (validStart && validEnd) results.push({ date: payDate, index });
+    });
     cursor = addMonths(cursor, 1);
   }
 
@@ -52,8 +80,11 @@ export async function materializeSalaryCredits(
   for (const profile of activeProfiles) {
     const dates = occurrenceDates(profile, new Date());
 
-    for (const payDate of dates) {
-      const key = `${profile.id}:${format(payDate, "yyyy-MM-dd")}`;
+    for (const occurrence of dates) {
+      const formattedDate = format(occurrence.date, "yyyy-MM-dd");
+      const occurrenceSuffix = occurrence.index === 0 ? "" : `:${occurrence.index + 1}`;
+      const documentSuffix = occurrence.index === 0 ? "" : `_${occurrence.index + 1}`;
+      const key = `${profile.id}:${formattedDate}${occurrenceSuffix}`;
       const existing = await getDocs(
         query(entriesRef, where("salaryOccurrenceKey", "==", key)),
       );
@@ -65,12 +96,12 @@ export async function materializeSalaryCredits(
         "users",
         uid,
         "entries",
-        `salary_${profile.id}_${format(payDate, "yyyyMMdd")}`,
+        `salary_${profile.id}_${format(occurrence.date, "yyyyMMdd")}${documentSuffix}`,
       );
 
-      await runTransaction(db, async (tx) => {
+      const wasCreated = await runTransaction(db, async (tx) => {
         const current = await tx.get(deterministicRef);
-        if (current.exists()) return;
+        if (current.exists()) return false;
 
         tx.set(deterministicRef, {
           type: "credit",
@@ -79,15 +110,17 @@ export async function materializeSalaryCredits(
           description: profile.name,
           amount: profile.amount,
           currency: profile.currency,
-          date: format(payDate, "yyyy-MM-dd"),
+          date: formattedDate,
           source: "salary",
           salaryProfileId: profile.id,
           salaryOccurrenceKey: key,
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp(),
         });
-        created += 1;
+        return true;
       });
+
+      if (wasCreated) created += 1;
     }
   }
 

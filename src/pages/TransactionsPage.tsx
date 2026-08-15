@@ -6,6 +6,7 @@ import {
   Button,
   Card,
   CardContent,
+  Chip,
   Dialog,
   DialogActions,
   DialogContent,
@@ -14,6 +15,7 @@ import {
   MenuItem,
   Stack,
   TextField,
+  Tooltip,
   Typography,
 } from "@mui/material";
 import { useState } from "react";
@@ -68,6 +70,11 @@ export function TransactionsPage() {
   }
 
   function edit(item: LedgerEntry) {
+    if (item.source === "debt_payment") {
+      setError("Linked debt-payment transactions cannot be edited here.");
+      return;
+    }
+
     setEditing(item);
     form.reset({
       type: item.type,
@@ -83,6 +90,12 @@ export function TransactionsPage() {
 
   async function submit(values: FormData) {
     if (!user) return;
+    if (editing?.source === "debt_payment") {
+      setError("Linked debt-payment transactions cannot be edited here.");
+      setOpen(false);
+      return;
+    }
+
     setError("");
     try {
       await saveEntry(
@@ -97,10 +110,14 @@ export function TransactionsPage() {
     }
   }
 
-  async function remove(id: string) {
+  async function remove(item: LedgerEntry) {
+    if (item.source === "debt_payment") {
+      setError("Linked debt-payment transactions cannot be deleted here.");
+      return;
+    }
     if (!user || !window.confirm("Delete this transaction?")) return;
     try {
-      await deleteEntry(user.uid, id);
+      await deleteEntry(user.uid, item.id);
       await data.refresh();
     } catch (err) {
       setError(toUserMessage(err));
@@ -130,36 +147,62 @@ export function TransactionsPage() {
               <Typography color="text.secondary">No transactions yet.</Typography>
             )}
 
-            {data.entries.map((item) => (
-              <Stack
-                key={item.id}
-                direction={{ xs: "column", sm: "row" }}
-                alignItems={{ sm: "center" }}
-                gap={1}
-                sx={{ py: 1.25, borderBottom: 1, borderColor: "divider" }}
-              >
-                <Box sx={{ flex: 1 }}>
-                  <Typography fontWeight={700}>{item.description}</Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    {item.date} · {item.group} · {item.category}
-                    {item.source === "salary" ? " · auto salary" : ""}
-                  </Typography>
-                </Box>
-                <Typography
-                  fontWeight={800}
-                  sx={{ minWidth: 140, textAlign: { sm: "right" } }}
+            {data.entries.map((item) => {
+              const isDebtPayment = item.source === "debt_payment";
+
+              return (
+                <Stack
+                  key={item.id}
+                  direction={{ xs: "column", sm: "row" }}
+                  alignItems={{ sm: "center" }}
+                  gap={1}
+                  sx={{ py: 1.25, borderBottom: 1, borderColor: "divider" }}
                 >
-                  {item.type === "debit" ? "−" : "+"}
-                  {formatMoney(item.amount, item.currency)}
-                </Typography>
-                <IconButton onClick={() => edit(item)} aria-label="Edit transaction">
-                  <EditRounded />
-                </IconButton>
-                <IconButton onClick={() => void remove(item.id)} aria-label="Delete transaction">
-                  <DeleteRounded />
-                </IconButton>
-              </Stack>
-            ))}
+                  <Box sx={{ flex: 1 }}>
+                    <Stack direction="row" alignItems="center" gap={1} flexWrap="wrap">
+                      <Typography fontWeight={700}>{item.description}</Typography>
+                      {isDebtPayment && (
+                        <Chip size="small" color="info" variant="outlined" label="Linked debt payment" />
+                      )}
+                    </Stack>
+                    <Typography variant="body2" color="text.secondary">
+                      {item.date} · {item.group} · {item.category}
+                      {item.source === "salary" ? " · auto salary" : ""}
+                      {isDebtPayment ? " · generated from debt payment" : ""}
+                    </Typography>
+                  </Box>
+                  <Typography
+                    fontWeight={800}
+                    sx={{ minWidth: 140, textAlign: { sm: "right" } }}
+                  >
+                    {item.type === "debit" ? "−" : "+"}
+                    {formatMoney(item.amount, item.currency)}
+                  </Typography>
+                  <Tooltip title={isDebtPayment ? "Linked debt payments cannot be edited here" : "Edit transaction"}>
+                    <span>
+                      <IconButton
+                        onClick={() => edit(item)}
+                        aria-label="Edit transaction"
+                        disabled={isDebtPayment}
+                      >
+                        <EditRounded />
+                      </IconButton>
+                    </span>
+                  </Tooltip>
+                  <Tooltip title={isDebtPayment ? "Linked debt payments cannot be deleted here" : "Delete transaction"}>
+                    <span>
+                      <IconButton
+                        onClick={() => void remove(item)}
+                        aria-label="Delete transaction"
+                        disabled={isDebtPayment}
+                      >
+                        <DeleteRounded />
+                      </IconButton>
+                    </span>
+                  </Tooltip>
+                </Stack>
+              );
+            })}
           </Stack>
         </CardContent>
       </Card>

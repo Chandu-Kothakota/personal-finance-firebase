@@ -19,10 +19,11 @@ A frontend-first, single-user personal finance web app.
 - Private login
 - No public registration screen
 - Primary and secondary income/debt grouping
-- Recurring salary profile with effective date and configurable monthly pay day
+- Recurring salary profile with effective date and up to two monthly pay days
 - Automatic missing salary-credit creation when the signed-in app starts/refreshes
 - Manual credit/debit transactions
 - Debt tracking for credit cards, loans and miscellaneous balances
+- Atomic debt payments that reduce a balance and create a linked ledger debit
 - Multiple currencies including USD/INR/CAD
 - Dashboard totals converted into a selectable base currency
 - Category expense chart
@@ -40,12 +41,15 @@ This app deliberately uses no Cloud Functions or scheduled backend.
 When data loads:
 
 1. Read active salary profiles.
-2. Calculate every expected monthly occurrence from `effectiveDate` through today.
+2. Calculate every expected occurrence for one or two configured pay days from
+   `effectiveDate` through today. A day beyond the end of a month uses that month's
+   last valid day.
 3. Build a unique occurrence key.
 4. Skip occurrences already present.
 5. Atomically create each missing salary credit.
 
 Therefore, if the app is not opened on the 15th, the salary appears automatically next time you sign in.
+Future pay dates are never materialized early.
 
 ## Firebase setup
 
@@ -149,6 +153,13 @@ users/{uid}
 ```
 
 All subcollections are restricted to the authenticated user's own UID.
+
+Salary profiles use `payDays` for the current one-or-two-day schedule and retain
+`payDay` as a compatibility field. Existing documents that contain only `payDay`
+continue to materialize normally without a migration.
+
+Debt-payment entries use `source: "debt_payment"` and store the linked `debtId`.
+The debt balance update and entry creation are committed in one Firestore transaction.
 
 ## Notes about exchange rates
 

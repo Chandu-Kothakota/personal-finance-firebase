@@ -12,7 +12,8 @@ export interface LedgerEntry {
   amount: number;
   currency: CurrencyCode;
   date: string;
-  source?: "manual" | "salary";
+  source?: "manual" | "salary" | "debt_payment";
+  debtId?: string;
   salaryProfileId?: string;
   salaryOccurrenceKey?: string;
   createdAt?: unknown;
@@ -38,7 +39,8 @@ export interface SalaryProfile {
   amount: number;
   currency: CurrencyCode;
   effectiveDate: string;
-  payDay: number;
+  payDays?: number[];
+  payDay?: number;
   active: boolean;
   updatedAt?: unknown;
 }
