@@ -96,7 +96,7 @@ export function DashboardPage() {
               <Typography variant="overline" sx={{ color: "rgba(255,255,255,.58)", fontWeight: 800, letterSpacing: ".1em" }}>NET FINANCIAL POSITION</Typography>
               <Typography variant="h3" sx={{ mt: 0.7, color: "#fff", fontVariantNumeric: "tabular-nums" }}>{formatMoney(data.summary.outstanding, base)}</Typography>
               <Typography sx={{ mt: 1.2, color: "rgba(255,255,255,.66)", maxWidth: 620 }}>
-                Current position after recorded expenses and tracked debt balances. All figures normalized to {base}.
+                Running balance of all credits and debits, including debt payments. All figures normalized to {base}.
               </Typography>
               <Stack direction="row" spacing={3.5} sx={{ mt: 3.2 }} flexWrap="wrap" useFlexGap>
                 <Box><Typography variant="caption" sx={{ color: "rgba(255,255,255,.52)" }}>TOTAL CREDITS</Typography><Typography variant="h6" sx={{ color: "#D1FAE5", mt: 0.3 }}>{formatMoney(data.summary.credits, base)}</Typography></Box>
@@ -121,7 +121,7 @@ export function DashboardPage() {
         <Grid size={{ xs: 12, sm: 6, xl: 3 }}><SummaryCard label="Total credits" value={formatMoney(data.summary.credits, base)} caption="Primary + secondary income" icon={<SavingsRounded />} tone="positive" /></Grid>
         <Grid size={{ xs: 12, sm: 6, xl: 3 }}><SummaryCard label="Debt portfolio" value={formatMoney(data.summary.debtBalances, base)} caption={`${data.debts.length} tracked account${data.debts.length === 1 ? "" : "s"}`} icon={<CreditCardRounded />} tone="warning" /></Grid>
         <Grid size={{ xs: 12, sm: 6, xl: 3 }}><SummaryCard label="Recorded expenses" value={formatMoney(data.summary.expenseDebits, base)} caption="Manual debit transactions" icon={<PaymentsRounded />} tone="negative" /></Grid>
-        <Grid size={{ xs: 12, sm: 6, xl: 3 }}><SummaryCard label="Net position" value={formatMoney(data.summary.outstanding, base)} caption="Credits − expenses − debt" icon={<TrendingUpRounded />} tone={isPositive ? "positive" : "negative"} /></Grid>
+        <Grid size={{ xs: 12, sm: 6, xl: 3 }}><SummaryCard label="Net position" value={formatMoney(data.summary.outstanding, base)} caption="Credits − expenses (incl. debt payments)" icon={<TrendingUpRounded />} tone={isPositive ? "positive" : "negative"} /></Grid>
       </Grid>
 
       <Grid container spacing={2.2}>
@@ -213,8 +213,8 @@ export function DashboardPage() {
               <Typography variant="body2" color="text.secondary" sx={{ mt: 0.4, mb: 2.5 }}>At-a-glance view of your two financial groups</Typography>
               <Stack spacing={1.5}>
                 {[
-                  { label: "Primary", credits: data.summary.primaryCredits, debts: data.summary.primaryDebts, icon: <WalletRounded fontSize="small" />, color: "#0F766E", bg: "#E4F5F2" },
-                  { label: "Secondary", credits: data.summary.secondaryCredits, debts: data.summary.secondaryDebts, icon: <AccountBalanceRounded fontSize="small" />, color: "#2563EB", bg: "#EAF1FF" },
+                  { label: "Primary", credits: data.summary.primaryCredits, debts: data.summary.primaryDebts, outstanding: data.summary.primaryOutstanding, icon: <WalletRounded fontSize="small" />, color: "#0F766E", bg: "#E4F5F2" },
+                  { label: "Secondary", credits: data.summary.secondaryCredits, debts: data.summary.secondaryDebts, outstanding: data.summary.secondaryOutstanding, icon: <AccountBalanceRounded fontSize="small" />, color: "#2563EB", bg: "#EAF1FF" },
                 ].map((group) => (
                   <Box key={group.label} sx={{ p: 2.2, borderRadius: 3, border: "1px solid #E6EAF0", bgcolor: "#FBFCFD" }}>
                     <Stack direction="row" alignItems="center" gap={1.4}>
@@ -222,8 +222,9 @@ export function DashboardPage() {
                       <Box sx={{ flex: 1 }}><Typography fontWeight={800}>{group.label}</Typography><Typography variant="caption" color="text.secondary">Portfolio group</Typography></Box>
                     </Stack>
                     <Grid container spacing={2} sx={{ mt: 0.6 }}>
-                      <Grid size={6}><Typography variant="caption" color="text.secondary">Credits</Typography><Typography fontWeight={800} sx={{ mt: 0.3 }}>{formatMoney(group.credits, base)}</Typography></Grid>
-                      <Grid size={6}><Typography variant="caption" color="text.secondary">Liabilities</Typography><Typography fontWeight={800} sx={{ mt: 0.3 }}>{formatMoney(group.debts, base)}</Typography></Grid>
+                      <Grid size={4}><Typography variant="caption" color="text.secondary">Credits</Typography><Typography fontWeight={800} sx={{ mt: 0.3 }}>{formatMoney(group.credits, base)}</Typography></Grid>
+                      <Grid size={4}><Typography variant="caption" color="text.secondary">Liabilities</Typography><Typography fontWeight={800} sx={{ mt: 0.3 }}>{formatMoney(group.debts, base)}</Typography></Grid>
+                      <Grid size={4}><Typography variant="caption" color="text.secondary">Outstanding</Typography><Typography fontWeight={800} sx={{ mt: 0.3, color: group.outstanding >= 0 ? "success.main" : "error.main" }}>{formatMoney(group.outstanding, base)}</Typography></Grid>
                     </Grid>
                   </Box>
                 ))}

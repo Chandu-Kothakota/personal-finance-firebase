@@ -76,8 +76,10 @@ export function useFinanceData() {
         outstanding: 0,
         primaryCredits: 0,
         primaryDebts: 0,
+        primaryOutstanding: 0,
         secondaryCredits: 0,
         secondaryDebts: 0,
+        secondaryOutstanding: 0,
       };
     }
 
@@ -112,7 +114,8 @@ export function useFinanceData() {
 
       return {
         credits: groupCredits,
-        debts: groupDebt + groupExpenseDebits,
+        debts: groupDebt,
+        outstanding: groupCredits - groupExpenseDebits,
       };
     };
 
@@ -123,11 +126,13 @@ export function useFinanceData() {
       credits,
       expenseDebits,
       debtBalances,
-      outstanding: credits - expenseDebits - debtBalances,
+      outstanding: credits - expenseDebits,
       primaryCredits: primary.credits,
       primaryDebts: primary.debts,
+      primaryOutstanding: primary.outstanding,
       secondaryCredits: secondary.credits,
       secondaryDebts: secondary.debts,
+      secondaryOutstanding: secondary.outstanding,
     };
   }, [entries, debts, fx]);
 
