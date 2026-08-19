@@ -246,19 +246,19 @@ export function DebtsPage() {
 
       <Grid container spacing={2}>
         <Grid size={{ xs: 12, lg: 6 }}>
-          <Card sx={{ height: "100%", color: "#fff", border: 0, background: "linear-gradient(125deg, #0B1F33 0%, #123A4A 68%, #0F766E 155%)" }}>
+          <Card sx={{ height: "100%", border: "1px solid #E6EAF0", background: "linear-gradient(135deg, #E4F5F2 0%, #F3F6F9 65%)" }}>
             <CardContent sx={{ p: 3, "&:last-child": { pb: 3 } }}>
               <Stack direction="row" justifyContent="space-between" alignItems="flex-start" gap={2}>
                 <Box>
-                  <Typography variant="overline" sx={{ color: "rgba(255,255,255,.58)", fontWeight: 800, letterSpacing: ".09em" }}>TOTAL OUTSTANDING</Typography>
-                  <Typography variant="h4" sx={{ mt: 0.7, color: "#fff", fontVariantNumeric: "tabular-nums" }}>
+                  <Typography variant="overline" sx={{ color: "text.secondary", fontWeight: 800, letterSpacing: ".09em" }}>TOTAL OUTSTANDING</Typography>
+                  <Typography variant="h4" sx={{ mt: 0.7, color: "#0B1F33", fontVariantNumeric: "tabular-nums" }}>
                     {formatMoney(data.summary.debtBalances, base)}
                   </Typography>
-                  <Typography variant="body2" sx={{ mt: 1, color: "rgba(255,255,255,.62)" }}>
+                  <Typography variant="body2" sx={{ mt: 1, color: "text.secondary" }}>
                     Consolidated portfolio balance in {base}
                   </Typography>
                 </Box>
-                <Box sx={{ width: 46, height: 46, borderRadius: 3, display: "grid", placeItems: "center", bgcolor: "rgba(94,234,212,.14)", color: "#99F6E4" }}>
+                <Box sx={{ width: 46, height: 46, borderRadius: 3, display: "grid", placeItems: "center", bgcolor: "rgba(15,118,110,.12)", color: "#0F766E" }}>
                   <AccountBalanceRounded />
                 </Box>
               </Stack>
