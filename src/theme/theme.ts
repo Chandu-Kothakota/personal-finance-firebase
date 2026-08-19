@@ -41,6 +41,11 @@ export const appTheme = createTheme({
           border: "1px solid #E6EAF0",
           boxShadow: "0 1px 2px rgba(16,24,40,0.03), 0 10px 30px rgba(16,24,40,0.04)",
           backgroundImage: "none",
+          transition: "box-shadow .2s ease, border-color .2s ease",
+          "&:hover": {
+            boxShadow: "0 2px 6px rgba(16,24,40,0.05), 0 16px 36px rgba(16,24,40,0.08)",
+            borderColor: "#D8DEE7",
+          },
         },
       },
     },
@@ -52,10 +57,11 @@ export const appTheme = createTheme({
     MuiButton: {
       defaultProps: { disableElevation: true },
       styleOverrides: {
-        root: { borderRadius: 10, minHeight: 40, paddingInline: 16 },
+        root: { borderRadius: 10, minHeight: 40, paddingInline: 16, transition: "box-shadow .18s ease, transform .18s ease" },
         containedPrimary: {
           boxShadow: `0 4px 12px ${alpha(teal, 0.18)}`,
-          "&:hover": { boxShadow: `0 6px 16px ${alpha(teal, 0.24)}` },
+          "&:hover": { boxShadow: `0 6px 16px ${alpha(teal, 0.24)}`, transform: "translateY(-1px)" },
+          "&:active": { transform: "translateY(0)" },
         },
       },
     },

@@ -80,7 +80,8 @@ function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
                   color: active ? "#FFFFFF" : "rgba(255,255,255,.68)",
                   bgcolor: active ? "rgba(20,184,166,.16)" : "transparent",
                   border: active ? "1px solid rgba(20,184,166,.22)" : "1px solid transparent",
-                  "&:hover": { bgcolor: "rgba(255,255,255,.07)", color: "#FFFFFF" },
+                  transition: "background-color .15s ease, color .15s ease, transform .15s ease",
+                  "&:hover": { bgcolor: "rgba(255,255,255,.07)", color: "#FFFFFF", transform: "translateX(2px)" },
                 }}
               >
                 <ListItemIcon sx={{ minWidth: 38, color: "inherit" }}>{link.icon}</ListItemIcon>
