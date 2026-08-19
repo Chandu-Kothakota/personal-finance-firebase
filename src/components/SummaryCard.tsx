@@ -15,14 +15,14 @@ export function SummaryCard({
   tone?: "neutral" | "positive" | "warning" | "negative";
 }) {
   const tones = {
-    neutral: { bg: "#EEF4F8", fg: "#0B1F33" },
-    positive: { bg: "#EAF8F0", fg: "#15803D" },
-    warning: { bg: "#FFF5E7", fg: "#B45309" },
-    negative: { bg: "#FDECEC", fg: "#B42318" },
+    neutral: { bg: "#EEF4F8", fg: "#0B1F33", accent: "#98A2B3" },
+    positive: { bg: "#EAF8F0", fg: "#15803D", accent: "#16A34A" },
+    warning: { bg: "#FFF5E7", fg: "#B45309", accent: "#D97706" },
+    negative: { bg: "#FDECEC", fg: "#B42318", accent: "#DC2626" },
   }[tone];
 
   return (
-    <Card sx={{ height: "100%" }}>
+    <Card sx={{ height: "100%", borderLeft: `3px solid ${tones.accent}` }}>
       <CardContent sx={{ p: 2.5, "&:last-child": { pb: 2.5 } }}>
         <Stack direction="row" justifyContent="space-between" alignItems="flex-start" gap={2}>
           <Box sx={{ minWidth: 0 }}>
