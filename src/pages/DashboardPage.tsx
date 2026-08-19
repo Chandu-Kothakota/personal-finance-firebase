@@ -18,18 +18,23 @@ import {
   Chip,
   Divider,
   Grid,
-  LinearProgress,
   Stack,
   Typography,
 } from "@mui/material";
 import type { ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import {
+  Bar,
+  BarChart,
+  CartesianGrid,
   Cell,
+  Legend,
   Pie,
   PieChart,
   ResponsiveContainer,
   Tooltip,
+  XAxis,
+  YAxis,
 } from "recharts";
 import { LoadingScreen } from "../components/LoadingScreen";
 import { SummaryCard } from "../components/SummaryCard";
@@ -38,12 +43,14 @@ import { convertToBase, formatMoney } from "../lib/currency";
 import type { CurrencyCode } from "../types";
 
 const PIE_COLORS = ["#0F766E", "#2563EB", "#D97706", "#7C3AED", "#DC2626", "#0891B2", "#475467"];
+const CREDIT_COLOR = "#16A34A";
+const LIABILITY_COLOR = "#DC2626";
 
 function AccountGroupCard({
   label,
   icon,
   color,
-  bg,
+  tint,
   credits,
   debts,
   outstanding,
@@ -52,21 +59,29 @@ function AccountGroupCard({
   label: string;
   icon: ReactNode;
   color: string;
-  bg: string;
+  tint: string;
   credits: number;
   debts: number;
   outstanding: number;
   base: CurrencyCode;
 }) {
   const positive = outstanding >= 0;
-  const ratio = credits > 0 ? Math.min(100, (debts / credits) * 100) : debts > 0 ? 100 : 0;
-  const ratioColor = ratio > 70 ? "#DC2626" : ratio > 40 ? "#D97706" : "#16A34A";
+  const liabilityTone = debts <= 0 ? "text.secondary" : debts > credits ? "error.main" : "warning.main";
+  const total = credits + debts;
+  const liabilityShare = total > 0 ? (debts / total) * 100 : 0;
+  const pieData =
+    total > 0
+      ? [
+          { name: "Credits", value: credits, color: CREDIT_COLOR },
+          { name: "Liabilities", value: debts, color: LIABILITY_COLOR },
+        ]
+      : [{ name: "No data", value: 1, color: "#E4E7EC" }];
 
   return (
-    <Card sx={{ height: "100%" }}>
+    <Card sx={{ height: "100%", overflow: "hidden", borderTop: `4px solid ${color}`, background: `linear-gradient(168deg, ${tint} 0%, #FFFFFF 58%)` }}>
       <CardContent sx={{ p: 3, "&:last-child": { pb: 3 } }}>
         <Stack direction="row" alignItems="center" gap={1.4}>
-          <Box sx={{ width: 44, height: 44, borderRadius: 2.8, display: "grid", placeItems: "center", bgcolor: bg, color, flexShrink: 0 }}>
+          <Box sx={{ width: 44, height: 44, borderRadius: 2.8, display: "grid", placeItems: "center", bgcolor: "#fff", color, flexShrink: 0, boxShadow: "0 6px 16px rgba(16,24,40,.08)" }}>
             {icon}
           </Box>
           <Box sx={{ minWidth: 0, flex: 1 }}>
@@ -84,59 +99,52 @@ function AccountGroupCard({
           />
         </Stack>
 
-        <Box sx={{ mt: 2.6 }}>
-          <Typography variant="caption" color="text.secondary" fontWeight={700} letterSpacing=".04em">
-            OUTSTANDING BALANCE
-          </Typography>
-          <Typography
-            variant="h3"
-            sx={{ mt: 0.4, fontVariantNumeric: "tabular-nums", color: positive ? "success.main" : "error.main" }}
-          >
-            {formatMoney(outstanding, base)}
-          </Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ mt: 0.4 }}>
-            What you currently have available in this group
-          </Typography>
-        </Box>
-
-        <Divider sx={{ my: 2.4 }} />
-
-        <Grid container spacing={2}>
+        <Grid container spacing={2} sx={{ mt: 2.2 }}>
           <Grid size={6}>
-            <Stack direction="row" gap={1.1} alignItems="flex-start">
-              <Box sx={{ width: 32, height: 32, borderRadius: 2, display: "grid", placeItems: "center", bgcolor: "#EAF8F0", color: "#15803D", flexShrink: 0, mt: 0.2 }}>
-                <ArrowUpwardRounded sx={{ fontSize: 17 }} />
-              </Box>
-              <Box sx={{ minWidth: 0 }}>
-                <Typography variant="caption" color="text.secondary">Credits</Typography>
-                <Typography fontWeight={800} noWrap>{formatMoney(credits, base)}</Typography>
-              </Box>
-            </Stack>
+            <Typography variant="caption" color="text.secondary" fontWeight={700} letterSpacing=".03em">
+              OUTSTANDING BALANCE
+            </Typography>
+            <Typography variant="h4" sx={{ mt: 0.3, fontVariantNumeric: "tabular-nums", color: positive ? "success.main" : "error.main" }} noWrap>
+              {formatMoney(outstanding, base)}
+            </Typography>
           </Grid>
           <Grid size={6}>
-            <Stack direction="row" gap={1.1} alignItems="flex-start">
-              <Box sx={{ width: 32, height: 32, borderRadius: 2, display: "grid", placeItems: "center", bgcolor: "#FFF5E7", color: "#B45309", flexShrink: 0, mt: 0.2 }}>
-                <CreditCardRounded sx={{ fontSize: 17 }} />
-              </Box>
-              <Box sx={{ minWidth: 0 }}>
-                <Typography variant="caption" color="text.secondary">Liabilities</Typography>
-                <Typography fontWeight={800} noWrap>{formatMoney(debts, base)}</Typography>
-              </Box>
-            </Stack>
+            <Typography variant="caption" color="text.secondary" fontWeight={700} letterSpacing=".03em">
+              OUTSTANDING LIABILITY
+            </Typography>
+            <Typography variant="h4" sx={{ mt: 0.3, fontVariantNumeric: "tabular-nums", color: liabilityTone }} noWrap>
+              {formatMoney(debts, base)}
+            </Typography>
           </Grid>
         </Grid>
 
-        <Box sx={{ mt: 2.6 }}>
-          <Stack direction="row" justifyContent="space-between" sx={{ mb: 0.7 }}>
-            <Typography variant="caption" color="text.secondary">Liabilities vs credits</Typography>
-            <Typography variant="caption" fontWeight={800}>{ratio.toFixed(0)}%</Typography>
+        <Stack direction="row" alignItems="center" gap={2.5} sx={{ mt: 2.8 }}>
+          <Box sx={{ width: 104, height: 104, position: "relative", flexShrink: 0 }}>
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie data={pieData} dataKey="value" nameKey="name" innerRadius={32} outerRadius={50} paddingAngle={total > 0 ? 4 : 0} stroke="none">
+                  {pieData.map((entry, index) => <Cell key={index} fill={entry.color} />)}
+                </Pie>
+              </PieChart>
+            </ResponsiveContainer>
+            <Box sx={{ position: "absolute", inset: 0, display: "grid", placeItems: "center" }}>
+              <Typography variant="body2" fontWeight={850}>{liabilityShare.toFixed(0)}%</Typography>
+            </Box>
+          </Box>
+          <Stack spacing={1.1} sx={{ flex: 1, minWidth: 0 }}>
+            <Stack direction="row" alignItems="center" gap={1}>
+              <Box sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: CREDIT_COLOR, flexShrink: 0 }} />
+              <Typography variant="body2" color="text.secondary" sx={{ flex: 1 }}>Credits</Typography>
+              <Typography variant="body2" fontWeight={800}>{formatMoney(credits, base)}</Typography>
+            </Stack>
+            <Stack direction="row" alignItems="center" gap={1}>
+              <Box sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: LIABILITY_COLOR, flexShrink: 0 }} />
+              <Typography variant="body2" color="text.secondary" sx={{ flex: 1 }}>Liabilities</Typography>
+              <Typography variant="body2" fontWeight={800}>{formatMoney(debts, base)}</Typography>
+            </Stack>
+            <Typography variant="caption" color="text.secondary">Share of liabilities in this group's total</Typography>
           </Stack>
-          <LinearProgress
-            variant="determinate"
-            value={ratio}
-            sx={{ height: 7, borderRadius: 999, bgcolor: "#EEF2F6", "& .MuiLinearProgress-bar": { borderRadius: 999, bgcolor: ratioColor } }}
-          />
-        </Box>
+        </Stack>
       </CardContent>
     </Card>
   );
@@ -162,6 +170,11 @@ export function DashboardPage() {
     .map(([name, value]) => ({ name, value }))
     .sort((a, b) => b.value - a.value)
     .slice(0, 7);
+
+  const groupChart = [
+    { name: "Primary", Balance: data.summary.primaryOutstanding, Liability: data.summary.primaryDebts },
+    { name: "Secondary", Balance: data.summary.secondaryOutstanding, Liability: data.summary.secondaryDebts },
+  ];
 
   const recent = [...data.entries].slice(0, 6);
   const totalOutflow = data.summary.expenseDebits + data.summary.debtBalances;
@@ -189,7 +202,7 @@ export function DashboardPage() {
             label="Primary"
             icon={<WalletRounded />}
             color="#0F766E"
-            bg="#E4F5F2"
+            tint="#E4F5F2"
             credits={data.summary.primaryCredits}
             debts={data.summary.primaryDebts}
             outstanding={data.summary.primaryOutstanding}
@@ -201,7 +214,7 @@ export function DashboardPage() {
             label="Secondary"
             icon={<AccountBalanceRounded />}
             color="#2563EB"
-            bg="#EAF1FF"
+            tint="#EAF1FF"
             credits={data.summary.secondaryCredits}
             debts={data.summary.secondaryDebts}
             outstanding={data.summary.secondaryOutstanding}
@@ -218,38 +231,31 @@ export function DashboardPage() {
       </Grid>
 
       <Grid container spacing={2.2}>
-        <Grid size={{ xs: 12, lg: 7 }}>
+        <Grid size={{ xs: 12, xl: 7 }}>
           <Card sx={{ height: "100%" }}>
-            <CardContent sx={{ p: 0 }}>
-              <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ p: 3, pb: 2 }}>
-                <Box><Typography variant="h6">Recent activity</Typography><Typography variant="body2" color="text.secondary">Latest recorded credits and debits</Typography></Box>
-                <Button size="small" onClick={() => navigate("/transactions")}>View all</Button>
+            <CardContent sx={{ p: 3 }}>
+              <Stack direction="row" justifyContent="space-between" alignItems="flex-start" mb={2.5}>
+                <Box><Typography variant="h6">Balance vs liability by group</Typography><Typography variant="body2" color="text.secondary" sx={{ mt: 0.4 }}>Outstanding balance and outstanding liability, side by side</Typography></Box>
+                <Chip size="small" label={base} variant="outlined" />
               </Stack>
-              <Divider />
-              {recent.length === 0 ? (
-                <Box sx={{ p: 4, textAlign: "center" }}><Typography color="text.secondary">No transactions recorded yet.</Typography></Box>
-              ) : recent.map((item, index) => (
-                <Box key={item.id}>
-                  <Stack
-                    direction="row"
-                    alignItems="center"
-                    gap={1.5}
-                    sx={{ px: 3, py: 1.65, transition: "background-color .15s ease", "&:hover": { bgcolor: "#FBFCFD" } }}
-                  >
-                    <Box sx={{ width: 38, height: 38, borderRadius: 2.3, display: "grid", placeItems: "center", bgcolor: item.type === "credit" ? "#EAF8F0" : "#FEF1F1", color: item.type === "credit" ? "#15803D" : "#B42318" }}>
-                      {item.type === "credit" ? <ArrowUpwardRounded fontSize="small" /> : <ArrowDownwardRounded fontSize="small" />}
-                    </Box>
-                    <Box sx={{ flex: 1, minWidth: 0 }}><Typography fontWeight={700} noWrap>{item.description}</Typography><Typography variant="caption" color="text.secondary">{item.category} · {item.group} · {item.date}</Typography></Box>
-                    <Typography fontWeight={800} color={item.type === "credit" ? "success.main" : "text.primary"}>{item.type === "credit" ? "+" : "−"}{formatMoney(item.amount, item.currency)}</Typography>
-                  </Stack>
-                  {index < recent.length - 1 && <Divider sx={{ ml: 8.8 }} />}
-                </Box>
-              ))}
+              <Box sx={{ height: 280 }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={groupChart} barGap={10}>
+                    <CartesianGrid stroke="#EEF1F4" vertical={false} />
+                    <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: "#667085", fontSize: 12 }} />
+                    <YAxis axisLine={false} tickLine={false} tick={{ fill: "#98A2B3", fontSize: 11 }} />
+                    <Tooltip formatter={(value) => formatMoney(Number(value ?? 0), base)} cursor={{ fill: "#F8FAFC" }} contentStyle={{ borderRadius: 12, border: "1px solid #E4E7EC", boxShadow: "0 10px 24px rgba(16,24,40,.08)" }} />
+                    <Legend iconType="circle" />
+                    <Bar dataKey="Balance" fill={CREDIT_COLOR} radius={[7, 7, 0, 0]} maxBarSize={54} />
+                    <Bar dataKey="Liability" fill={LIABILITY_COLOR} radius={[7, 7, 0, 0]} maxBarSize={54} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </Box>
             </CardContent>
           </Card>
         </Grid>
 
-        <Grid size={{ xs: 12, lg: 5 }}>
+        <Grid size={{ xs: 12, xl: 5 }}>
           <Card sx={{ height: "100%" }}>
             <CardContent sx={{ p: 3 }}>
               <Typography variant="h6">Expense composition</Typography>
@@ -278,6 +284,35 @@ export function DashboardPage() {
           </Card>
         </Grid>
       </Grid>
+
+      <Card>
+        <CardContent sx={{ p: 0 }}>
+          <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ p: 3, pb: 2 }}>
+            <Box><Typography variant="h6">Recent activity</Typography><Typography variant="body2" color="text.secondary">Latest recorded credits and debits</Typography></Box>
+            <Button size="small" onClick={() => navigate("/transactions")}>View all</Button>
+          </Stack>
+          <Divider />
+          {recent.length === 0 ? (
+            <Box sx={{ p: 4, textAlign: "center" }}><Typography color="text.secondary">No transactions recorded yet.</Typography></Box>
+          ) : recent.map((item, index) => (
+            <Box key={item.id}>
+              <Stack
+                direction="row"
+                alignItems="center"
+                gap={1.5}
+                sx={{ px: 3, py: 1.65, transition: "background-color .15s ease", "&:hover": { bgcolor: "#FBFCFD" } }}
+              >
+                <Box sx={{ width: 38, height: 38, borderRadius: 2.3, display: "grid", placeItems: "center", bgcolor: item.type === "credit" ? "#EAF8F0" : "#FEF1F1", color: item.type === "credit" ? "#15803D" : "#B42318" }}>
+                  {item.type === "credit" ? <ArrowUpwardRounded fontSize="small" /> : <ArrowDownwardRounded fontSize="small" />}
+                </Box>
+                <Box sx={{ flex: 1, minWidth: 0 }}><Typography fontWeight={700} noWrap>{item.description}</Typography><Typography variant="caption" color="text.secondary">{item.category} · {item.group} · {item.date}</Typography></Box>
+                <Typography fontWeight={800} color={item.type === "credit" ? "success.main" : "text.primary"}>{item.type === "credit" ? "+" : "−"}{formatMoney(item.amount, item.currency)}</Typography>
+              </Stack>
+              {index < recent.length - 1 && <Divider sx={{ ml: 8.8 }} />}
+            </Box>
+          ))}
+        </CardContent>
+      </Card>
     </Stack>
   );
 }
