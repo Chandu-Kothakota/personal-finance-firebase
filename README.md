@@ -8,11 +8,10 @@ A frontend-first, single-user personal finance web app.
 - Material UI
 - Recharts
 - Firebase Authentication (email/password)
-- Cloud Firestore
-- Firebase Hosting
-- GitHub Actions
+- Neon Postgres (serverless driver)
+- Vercel (static hosting + `/api` serverless function)
 - Frankfurter daily FX reference-rate API
-- No custom API/server/Cloud Functions
+- API: a single Vercel function in `api/[...path].ts` that verifies the Firebase ID token and scopes every query to that user
 
 ## Features
 
@@ -29,16 +28,13 @@ A frontend-first, single-user personal finance web app.
 - Category expense chart
 - Primary vs secondary chart
 - Edit/delete support
-- Firestore per-user security rules
-- Browser offline Firestore cache
+- Per-user data isolation enforced server-side (every query filters by the verified uid)
 - FX cache with stale-data fallback
 - Error boundary and user-facing exception handling
 
 ## Salary auto-credit behavior
 
-This app deliberately uses no Cloud Functions or scheduled backend.
-
-When data loads:
+There is no scheduled job. The API does this whenever the app loads data:
 
 1. Read active salary profiles.
 2. Calculate every expected occurrence for one or two configured pay days from
@@ -46,7 +42,7 @@ When data loads:
    last valid day.
 3. Build a unique occurrence key.
 4. Skip occurrences already present.
-5. Atomically create each missing salary credit.
+5. Insert each missing salary credit (`ON CONFLICT DO NOTHING`, so it is idempotent).
 
 Therefore, if the app is not opened on the 15th, the salary appears automatically next time you sign in.
 Future pay dates are never materialized early.
@@ -224,3 +220,26 @@ starter-style interface with a production-oriented application experience.
 
 Keep your existing `.env.local` locally. It is intentionally not included in this package.
 The Firebase configuration, Firestore rules, and GitHub workflows from the supplied project are retained.
+
+
+## Database (Neon Postgres)
+
+Schema lives in `db/schema.sql`.
+
+```bash
+export DATABASE_URL='postgres://…neon.tech/neondb?sslmode=require'
+npm run db:migrate                                   # create tables (idempotent)
+
+# one-off: copy existing Firestore data into Neon
+export GOOGLE_APPLICATION_CREDENTIALS=/path/to/service-account.json
+npm run import:firestore -- --dry-run                # preview counts
+npm run import:firestore                             # import (safe to re-run)
+```
+
+Salary credits are now created server-side when the app loads data (`api/_lib/salary.ts`), using the same deterministic ids/keys as before so imported history is not duplicated.
+
+## Deploying on Vercel
+
+1. Import the GitHub repo in Vercel (framework preset: Vite).
+2. Add env vars: all `VITE_FIREBASE_*`, `VITE_BASE_CURRENCY`, and `DATABASE_URL`.
+3. In Firebase console → Authentication → Settings → Authorized domains, add your Vercel domain.

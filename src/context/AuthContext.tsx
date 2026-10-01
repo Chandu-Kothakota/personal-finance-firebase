@@ -13,7 +13,6 @@ import {
   type ReactNode,
 } from "react";
 import { auth } from "../config/firebase";
-import { ensureUserDocument } from "../services/firestoreService";
 
 type AuthContextValue = {
   user: User | null;
@@ -29,17 +28,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    return onAuthStateChanged(auth, async (nextUser) => {
+    return onAuthStateChanged(auth, (nextUser) => {
       setUser(nextUser);
       setLoading(false);
-
-      if (nextUser) {
-        try {
-          await ensureUserDocument(nextUser.uid, nextUser.email);
-        } catch (error) {
-          console.error("Could not update user metadata", error);
-        }
-      }
     });
   }, []);
 

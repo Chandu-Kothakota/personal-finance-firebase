@@ -22,7 +22,7 @@ export class ErrorBoundary extends Component<
           <Alert severity="error">
             <Typography fontWeight={800}>The dashboard encountered an unexpected error.</Typography>
             <Typography variant="body2" sx={{ mt: 1 }}>
-              Reload the page. Your saved Firestore data is not removed.
+              Reload the page. Your saved data is not removed.
             </Typography>
             <Button sx={{ mt: 2 }} variant="outlined" onClick={() => window.location.reload()}>
               Reload
