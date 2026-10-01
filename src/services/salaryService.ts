@@ -1,12 +1,4 @@
-import {
-  collection,
-  doc,
-  getDocs,
-  query,
-  runTransaction,
-  where,
-  serverTimestamp,
-} from "firebase/firestore";
+import { doc, runTransaction, serverTimestamp } from "firebase/firestore";
 import {
   addMonths,
   format,
@@ -70,11 +62,11 @@ function occurrenceDates(profile: SalaryProfile, today: Date): SalaryOccurrence[
 export async function materializeSalaryCredits(
   uid: string,
   profiles: SalaryProfile[],
+  existingKeys: Set<string>,
 ): Promise<number> {
   const activeProfiles = profiles.filter((p) => p.active);
   if (activeProfiles.length === 0) return 0;
 
-  const entriesRef = collection(db, "users", uid, "entries");
   let created = 0;
 
   for (const profile of activeProfiles) {
@@ -85,11 +77,7 @@ export async function materializeSalaryCredits(
       const occurrenceSuffix = occurrence.index === 0 ? "" : `:${occurrence.index + 1}`;
       const documentSuffix = occurrence.index === 0 ? "" : `_${occurrence.index + 1}`;
       const key = `${profile.id}:${formattedDate}${occurrenceSuffix}`;
-      const existing = await getDocs(
-        query(entriesRef, where("salaryOccurrenceKey", "==", key)),
-      );
-
-      if (!existing.empty) continue;
+      if (existingKeys.has(key)) continue;
 
       const deterministicRef = doc(
         db,
