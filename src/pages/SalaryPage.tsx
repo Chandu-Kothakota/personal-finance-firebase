@@ -1,42 +1,37 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import {
-  AccountBalanceWalletRounded,
-  AddRounded,
-  CalendarMonthRounded,
-  CheckCircleRounded,
-  EditRounded,
-  EventRepeatRounded,
-  PauseCircleRounded,
-  PaymentsRounded,
-} from "@mui/icons-material";
+import { AddOutlined, EditOutlined } from "@mui/icons-material";
 import {
   Alert,
   Box,
   Button,
-  Card,
-  CardContent,
-  Chip,
   Dialog,
   DialogActions,
   DialogContent,
   DialogTitle,
-  Divider,
   Grid,
   IconButton,
   MenuItem,
   Stack,
   Switch,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
   TextField,
   Tooltip,
   Typography,
 } from "@mui/material";
+import { visuallyHidden } from "@mui/utils";
 import { useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { z } from "zod";
 import { LoadingScreen } from "../components/LoadingScreen";
+import { EmptyState, PageHeader, Panel, StatCard, StatusBadge, labelOf } from "../components/ui";
 import { useAuth } from "../context/AuthContext";
 import { useFinanceData } from "../hooks/useFinanceData";
-import { CURRENCIES, convertToBase, formatMoney } from "../lib/currency";
+import { CURRENCIES, convertToBase, formatDate, formatMoney } from "../lib/currency";
 import { toUserMessage } from "../lib/errors";
 import { saveSalaryProfile } from "../services/apiService";
 import { getSalaryPayDays } from "../services/salaryService";
@@ -158,153 +153,105 @@ export function SalaryPage() {
       )
     : 0;
   const base = data.settings.baseCurrency;
+  const ordinal = (n: number) => {
+    const suffix = n % 100 >= 11 && n % 100 <= 13 ? "th" : ({ 1: "st", 2: "nd", 3: "rd" } as Record<number, string>)[n % 10] ?? "th";
+    return `${n}${suffix}`;
+  };
 
   return (
-    <Stack spacing={3}>
-      <Stack direction={{ xs: "column", md: "row" }} justifyContent="space-between" alignItems={{ md: "center" }} gap={2}>
-        <Box>
-          <Typography variant="h4">Recurring income</Typography>
-          <Typography color="text.secondary" sx={{ mt: 0.6 }}>
-            Manage recurring earnings and see the monthly deposit schedule at a glance.
-          </Typography>
-        </Box>
-        <Button variant="contained" startIcon={<AddRounded />} onClick={add} sx={{ alignSelf: { xs: "flex-start", md: "auto" } }}>
-          Add earning
-        </Button>
+    <Box>
+      <PageHeader
+        title="Income"
+        description="Recurring income schedules. Credits are added automatically on each pay date."
+        actions={
+          <Button variant="contained" startIcon={<AddOutlined />} onClick={add}>
+            New income schedule
+          </Button>
+        }
+      />
+
+      <Stack spacing={2}>
+        {error && <Alert severity="error">{error}</Alert>}
+        {data.error && <Alert severity="error">{data.error}</Alert>}
+
+        <Grid container spacing={2}>
+          <Grid size={{ xs: 12, sm: 4 }}>
+            <StatCard label="Projected monthly income" value={formatMoney(projectedMonthlyIncome, base)} caption={`Active schedules, in ${base}`} />
+          </Grid>
+          <Grid size={{ xs: 12, sm: 4 }}>
+            <StatCard
+              label="Active schedules"
+              value={String(activeProfiles.length)}
+              caption={pausedProfiles.length > 0 ? `${pausedProfiles.length} paused` : "None paused"}
+            />
+          </Grid>
+          <Grid size={{ xs: 12, sm: 4 }}>
+            <StatCard label="Deposits per month" value={String(expectedDeposits)} caption="Across active schedules" />
+          </Grid>
+        </Grid>
+
+        <Panel title="Schedules" flush>
+          {data.salaryProfiles.length === 0 ? (
+            <EmptyState
+              title="No income schedules"
+              message="Add your salary or other regular income to have credits recorded automatically on each pay date."
+              action={<Button startIcon={<AddOutlined />} onClick={add}>New income schedule</Button>}
+            />
+          ) : (
+            <TableContainer>
+              <Table size="small">
+                <TableHead>
+                  <TableRow>
+                    <TableCell>Name</TableCell>
+                    <TableCell sx={{ display: { xs: "none", md: "table-cell" } }}>Pay days</TableCell>
+                    <TableCell sx={{ display: { xs: "none", lg: "table-cell" } }}>Effective</TableCell>
+                    <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>Status</TableCell>
+                    <TableCell align="right">Per paycheck</TableCell>
+                    <TableCell align="right" sx={{ display: { xs: "none", md: "table-cell" } }}>Monthly</TableCell>
+                    <TableCell align="right"><Box component="span" sx={visuallyHidden}>Actions</Box></TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {data.salaryProfiles.map((profile) => (
+                    <TableRow key={profile.id} hover>
+                      <TableCell>
+                        <Typography variant="body2" fontWeight={500}>{profile.name}</Typography>
+                        <Typography variant="caption" color="text.secondary">{labelOf(profile.group)} · {profile.currency}</Typography>
+                      </TableCell>
+                      <TableCell sx={{ display: { xs: "none", md: "table-cell" }, color: "text.secondary" }}>
+                        {getSalaryPayDays(profile).map(ordinal).join(" & ")} of the month
+                      </TableCell>
+                      <TableCell sx={{ display: { xs: "none", lg: "table-cell" }, color: "text.secondary", whiteSpace: "nowrap" }}>{formatDate(profile.effectiveDate)}</TableCell>
+                      <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>
+                        <StatusBadge label={profile.active ? "Active" : "Paused"} status={profile.active ? "positive" : "neutral"} />
+                      </TableCell>
+                      <TableCell align="right" sx={{ fontWeight: 600, fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>
+                        {formatMoney(profile.amount, profile.currency)}
+                      </TableCell>
+                      <TableCell align="right" sx={{ display: { xs: "none", md: "table-cell" }, fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap", color: "text.secondary" }}>
+                        {formatMoney(monthlyAmount(profile), profile.currency)}
+                      </TableCell>
+                      <TableCell align="right" sx={{ py: 0.5 }}>
+                        <Tooltip title="Edit">
+                          <IconButton size="small" onClick={() => edit(profile)} aria-label={`Edit ${profile.name}`}><EditOutlined fontSize="small" /></IconButton>
+                        </Tooltip>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          )}
+        </Panel>
+
+        <Typography variant="caption" color="text.secondary">
+          Pay days are calendar dates (1–31); shorter months use their last day. Weekends and holidays are not shifted,
+          and credits are only added once each date arrives.
+        </Typography>
       </Stack>
 
-      {error && <Alert severity="error">{error}</Alert>}
-      {data.error && <Alert severity="error">{data.error}</Alert>}
-
-      <Grid container spacing={2}>
-        <Grid size={{ xs: 12, lg: 6 }}>
-          <Card sx={{ height: "100%", border: "1px solid #E6EAF0", background: "linear-gradient(135deg, #E4F5F2 0%, #F3F6F9 65%)" }}>
-            <CardContent sx={{ p: 3, "&:last-child": { pb: 3 } }}>
-              <Stack direction="row" justifyContent="space-between" alignItems="flex-start" gap={2}>
-                <Box>
-                  <Typography variant="overline" sx={{ color: "text.secondary", fontWeight: 800, letterSpacing: ".09em" }}>PROJECTED MONTHLY INCOME</Typography>
-                  <Typography variant="h4" sx={{ mt: 0.7, color: "#0B1F33", fontVariantNumeric: "tabular-nums" }}>
-                    {formatMoney(projectedMonthlyIncome, base)}
-                  </Typography>
-                  <Typography variant="body2" sx={{ mt: 1, color: "text.secondary" }}>
-                    Active schedules normalized to {base}
-                  </Typography>
-                </Box>
-                <Box sx={{ width: 46, height: 46, borderRadius: 3, display: "grid", placeItems: "center", bgcolor: "rgba(15,118,110,.12)", color: "#0F766E" }}>
-                  <AccountBalanceWalletRounded />
-                </Box>
-              </Stack>
-            </CardContent>
-          </Card>
-        </Grid>
-        <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
-          <Card sx={{ height: "100%" }}>
-            <CardContent sx={{ p: 2.5, "&:last-child": { pb: 2.5 } }}>
-              <Box sx={{ width: 40, height: 40, borderRadius: 2.5, display: "grid", placeItems: "center", bgcolor: "#EAF8F0", color: "#15803D" }}><CheckCircleRounded /></Box>
-              <Typography variant="h5" sx={{ mt: 2 }}>{activeProfiles.length}</Typography>
-              <Typography variant="body2" color="text.secondary" sx={{ mt: 0.4 }}>Active schedule{activeProfiles.length === 1 ? "" : "s"}</Typography>
-              {pausedProfiles.length > 0 && <Typography variant="caption" color="text.secondary">{pausedProfiles.length} paused</Typography>}
-            </CardContent>
-          </Card>
-        </Grid>
-        <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
-          <Card sx={{ height: "100%" }}>
-            <CardContent sx={{ p: 2.5, "&:last-child": { pb: 2.5 } }}>
-              <Box sx={{ width: 40, height: 40, borderRadius: 2.5, display: "grid", placeItems: "center", bgcolor: "#EAF1FF", color: "#2563EB" }}><EventRepeatRounded /></Box>
-              <Typography variant="h5" sx={{ mt: 2 }}>{expectedDeposits}</Typography>
-              <Typography variant="body2" color="text.secondary" sx={{ mt: 0.4 }}>Expected deposit{expectedDeposits === 1 ? "" : "s"} per month</Typography>
-            </CardContent>
-          </Card>
-        </Grid>
-      </Grid>
-
-      <Alert severity="info" icon={<CalendarMonthRounded />}>
-        Pay days use calendar dates from 1–31; shorter months use their last valid day.
-        Weekends and holidays are not shifted. Credits appear only after each scheduled date arrives.
-      </Alert>
-
-      {data.salaryProfiles.length === 0 ? (
-        <Card>
-          <CardContent>
-            <Stack alignItems="center" textAlign="center" sx={{ py: 5 }}>
-              <Box sx={{ width: 58, height: 58, borderRadius: 3, display: "grid", placeItems: "center", bgcolor: "#E4F5F2", color: "#0F766E" }}>
-                <PaymentsRounded />
-              </Box>
-              <Typography variant="h6" sx={{ mt: 2 }}>No recurring income schedules</Typography>
-              <Typography variant="body2" color="text.secondary" sx={{ mt: 0.6, maxWidth: 450 }}>
-                Add your salary or other predictable income to automate ledger credits when each pay date arrives.
-              </Typography>
-              <Button startIcon={<AddRounded />} onClick={add} sx={{ mt: 2 }}>Add earning</Button>
-            </Stack>
-          </CardContent>
-        </Card>
-      ) : (
-        <Grid container spacing={2}>
-          {data.salaryProfiles.map((profile) => {
-            const payDays = getSalaryPayDays(profile);
-            const statusColor = profile.active ? "#16A34A" : "#98A2B3";
-
-            return (
-              <Grid key={profile.id} size={{ xs: 12, md: 6, xl: 4 }}>
-                <Card sx={{ height: "100%", borderTop: `3px solid ${statusColor}` }}>
-                  <CardContent sx={{ p: 2.5, height: "100%", display: "flex", flexDirection: "column", "&:last-child": { pb: 2.5 } }}>
-                    <Stack direction="row" justifyContent="space-between" alignItems="flex-start" gap={2}>
-                      <Stack direction="row" gap={1.3} alignItems="center" sx={{ minWidth: 0 }}>
-                        <Box sx={{ width: 42, height: 42, borderRadius: 2.5, display: "grid", placeItems: "center", bgcolor: profile.active ? "#EAF8F0" : "#F2F4F7", color: profile.active ? "#15803D" : "#667085", flexShrink: 0 }}>
-                          {profile.active ? <PaymentsRounded /> : <PauseCircleRounded />}
-                        </Box>
-                        <Box sx={{ minWidth: 0 }}>
-                          <Typography variant="h6" noWrap>{profile.name}</Typography>
-                          <Typography variant="body2" color="text.secondary" sx={{ textTransform: "capitalize" }}>{profile.group} income</Typography>
-                        </Box>
-                      </Stack>
-                      <Tooltip title="Edit income schedule">
-                        <IconButton size="small" onClick={() => edit(profile)} aria-label={`Edit ${profile.name}`}><EditRounded fontSize="small" /></IconButton>
-                      </Tooltip>
-                    </Stack>
-
-                    <Stack direction="row" gap={0.8} flexWrap="wrap" sx={{ mt: 2 }}>
-                      <Chip size="small" color={profile.active ? "success" : "default"} label={profile.active ? "Active" : "Paused"} />
-                      <Chip size="small" variant="outlined" label={profile.currency} />
-                      <Chip size="small" variant="outlined" label={`${payDays.length}× monthly`} />
-                    </Stack>
-
-                    <Box sx={{ mt: 2.4 }}>
-                      <Typography variant="caption" color="text.secondary" fontWeight={700}>PER PAYCHECK</Typography>
-                      <Typography variant="h5" sx={{ mt: 0.45, fontVariantNumeric: "tabular-nums" }}>
-                        {formatMoney(profile.amount, profile.currency)}
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary" sx={{ mt: 0.45 }}>
-                        {formatMoney(monthlyAmount(profile), profile.currency)} scheduled monthly
-                      </Typography>
-                    </Box>
-
-                    <Divider sx={{ my: 2 }} />
-
-                    <Typography variant="caption" color="text.secondary" fontWeight={700}>PAY SCHEDULE</Typography>
-                    <Stack direction="row" gap={1} sx={{ mt: 1 }}>
-                      {payDays.map((day, index) => (
-                        <Box key={`${profile.id}-${day}`} sx={{ flex: 1, p: 1.4, borderRadius: 2.5, bgcolor: "#F8FAFC", border: "1px solid", borderColor: "divider" }}>
-                          <Typography variant="caption" color="text.secondary">Pay day {index + 1}</Typography>
-                          <Typography fontWeight={850} sx={{ mt: 0.2 }}>Day {day}</Typography>
-                        </Box>
-                      ))}
-                    </Stack>
-
-                    <Stack direction="row" alignItems="center" gap={0.8} sx={{ mt: 2, color: "text.secondary" }}>
-                      <CalendarMonthRounded fontSize="small" />
-                      <Typography variant="body2">Effective {profile.effectiveDate}</Typography>
-                    </Stack>
-                  </CardContent>
-                </Card>
-              </Grid>
-            );
-          })}
-        </Grid>
-      )}
-
       <Dialog open={open} onClose={() => setOpen(false)} fullWidth maxWidth="sm">
-        <DialogTitle>{editing ? "Edit recurring income" : "Add recurring income"}</DialogTitle>
+        <DialogTitle>{editing ? "Edit income schedule" : "New income schedule"}</DialogTitle>
         <Box component="form" onSubmit={form.handleSubmit(submit)}>
           <DialogContent dividers>
             <Grid container spacing={2} sx={{ mt: 0.25 }}>
@@ -350,10 +297,10 @@ export function SalaryPage() {
               </Grid>
               <Grid size={12}>
                 <Controller name="active" control={form.control} render={({ field }) => (
-                  <Box sx={{ p: 1.8, borderRadius: 2.5, bgcolor: "#F8FAFC", border: "1px solid", borderColor: "divider" }}>
+                  <Box sx={{ p: 1.5, borderRadius: 1, bgcolor: "background.default", border: 1, borderColor: "divider" }}>
                     <Stack direction="row" alignItems="center" justifyContent="space-between" gap={2}>
                       <Box>
-                        <Typography fontWeight={750}>Active schedule</Typography>
+                        <Typography variant="body2" fontWeight={600}>Active schedule</Typography>
                         <Typography variant="body2" color="text.secondary">Paused schedules do not create new credits.</Typography>
                       </Box>
                       <Switch checked={field.value} onChange={(_, checked) => field.onChange(checked)} />
@@ -369,6 +316,6 @@ export function SalaryPage() {
           </DialogActions>
         </Box>
       </Dialog>
-    </Stack>
+    </Box>
   );
 }

@@ -1,21 +1,9 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import {
-  AddRounded,
-  ArrowDownwardRounded,
-  ArrowUpwardRounded,
-  DeleteRounded,
-  EditRounded,
-  ReceiptLongRounded,
-  SearchRounded,
-  SwapVertRounded,
-} from "@mui/icons-material";
+import { AddOutlined, DeleteOutline, EditOutlined, SearchOutlined } from "@mui/icons-material";
 import {
   Alert,
   Box,
   Button,
-  Card,
-  CardContent,
-  Chip,
   Dialog,
   DialogActions,
   DialogContent,
@@ -26,17 +14,25 @@ import {
   InputAdornment,
   MenuItem,
   Stack,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
   TextField,
   Tooltip,
   Typography,
 } from "@mui/material";
+import { visuallyHidden } from "@mui/utils";
 import { useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { z } from "zod";
 import { LoadingScreen } from "../components/LoadingScreen";
+import { Amount, EmptyState, PageHeader, Panel, StatCard, StatusBadge, labelOf } from "../components/ui";
 import { useAuth } from "../context/AuthContext";
 import { useFinanceData } from "../hooks/useFinanceData";
-import { CURRENCIES, formatMoney } from "../lib/currency";
+import { CURRENCIES, formatDate, formatMoney } from "../lib/currency";
 import { toUserMessage } from "../lib/errors";
 import { deleteEntry, saveEntry } from "../services/apiService";
 import type { LedgerEntry } from "../types";
@@ -67,9 +63,15 @@ const defaults: FormData = {
 };
 
 function sourceLabel(item: LedgerEntry): string {
-  if (item.source === "salary") return "Auto salary";
-  if (item.source === "debt_payment") return "Linked debt payment";
+  if (item.source === "salary") return "Salary";
+  if (item.source === "debt_payment") return "Debt payment";
   return "Manual";
+}
+
+function sourceStatus(item: LedgerEntry) {
+  if (item.source === "salary") return "positive" as const;
+  if (item.source === "debt_payment") return "info" as const;
+  return "neutral" as const;
 }
 
 export function TransactionsPage() {
@@ -164,185 +166,138 @@ export function TransactionsPage() {
   if (data.loading) return <LoadingScreen label="Loading transactions…" />;
 
   const base = data.settings.baseCurrency;
-  const stats = [
-    {
-      label: "Total inflow",
-      value: formatMoney(data.summary.credits, base),
-      caption: "All recorded credits",
-      color: "#15803D",
-      background: "#EAF8F0",
-      icon: <ArrowUpwardRounded />,
-    },
-    {
-      label: "Total outflow",
-      value: formatMoney(data.summary.expenseDebits, base),
-      caption: "Expenses and debt payments",
-      color: "#B42318",
-      background: "#FEF1F1",
-      icon: <ArrowDownwardRounded />,
-    },
-    {
-      label: "Ledger activity",
-      value: data.entries.length.toLocaleString(),
-      caption: `${base} base reporting`,
-      color: "#2563EB",
-      background: "#EAF1FF",
-      icon: <SwapVertRounded />,
-    },
-  ];
+  const filtersActive = normalizedSearch !== "" || typeFilter !== "all" || groupFilter !== "all";
 
   return (
-    <Stack spacing={3}>
-      <Stack
-        direction={{ xs: "column", md: "row" }}
-        justifyContent="space-between"
-        alignItems={{ md: "center" }}
-        gap={2}
-      >
-        <Box>
-          <Typography variant="h4">Transactions</Typography>
-          <Typography color="text.secondary" sx={{ mt: 0.6 }}>
-            Review every credit, expense, salary deposit, and linked debt payment.
-          </Typography>
-        </Box>
-        <Stack direction="row" alignItems="center" gap={1.2} flexWrap="wrap">
-          <Chip label={`${data.entries.length} record${data.entries.length === 1 ? "" : "s"}`} variant="outlined" sx={{ bgcolor: "#fff" }} />
-          <Button variant="contained" startIcon={<AddRounded />} onClick={addNew}>
-            Add transaction
+    <Box>
+      <PageHeader
+        title="Transactions"
+        description="Every credit, expense, salary deposit and debt payment."
+        actions={
+          <Button variant="contained" startIcon={<AddOutlined />} onClick={addNew}>
+            New transaction
           </Button>
-        </Stack>
-      </Stack>
+        }
+      />
 
-      {error && <Alert severity="error">{error}</Alert>}
-      {data.error && <Alert severity="error">{data.error}</Alert>}
+      <Stack spacing={2}>
+        {error && <Alert severity="error">{error}</Alert>}
+        {data.error && <Alert severity="error">{data.error}</Alert>}
 
-      <Grid container spacing={2}>
-        {stats.map((stat) => (
-          <Grid key={stat.label} size={{ xs: 12, sm: 6, lg: 4 }}>
-            <Card sx={{ height: "100%" }}>
-              <CardContent sx={{ p: 2.5, "&:last-child": { pb: 2.5 } }}>
-                <Stack direction="row" justifyContent="space-between" alignItems="flex-start" gap={2}>
-                  <Box>
-                    <Typography variant="body2" color="text.secondary" fontWeight={650}>{stat.label}</Typography>
-                    <Typography variant="h5" sx={{ mt: 0.8, fontVariantNumeric: "tabular-nums" }}>{stat.value}</Typography>
-                    <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 0.7 }}>{stat.caption}</Typography>
-                  </Box>
-                  <Box sx={{ width: 42, height: 42, borderRadius: 2.5, display: "grid", placeItems: "center", color: stat.color, bgcolor: stat.background }}>
-                    {stat.icon}
-                  </Box>
-                </Stack>
-              </CardContent>
-            </Card>
+        <Grid container spacing={2}>
+          <Grid size={{ xs: 12, sm: 4 }}>
+            <StatCard label="Total income" value={formatMoney(data.summary.credits, base)} caption="All recorded credits" />
           </Grid>
-        ))}
-      </Grid>
+          <Grid size={{ xs: 12, sm: 4 }}>
+            <StatCard label="Total expenses" value={formatMoney(data.summary.expenseDebits, base)} caption="Expenses and debt payments" />
+          </Grid>
+          <Grid size={{ xs: 12, sm: 4 }}>
+            <StatCard label="Records" value={data.entries.length.toLocaleString()} caption={`Totals shown in ${base}`} />
+          </Grid>
+        </Grid>
 
-      <Card>
-        <CardContent sx={{ p: 0, "&:last-child": { pb: 0 } }}>
-          <Stack direction={{ xs: "column", lg: "row" }} gap={1.5} sx={{ p: 2.5 }}>
+        <Panel flush>
+          <Stack direction={{ xs: "column", md: "row" }} gap={1.5} sx={{ p: 2 }}>
             <TextField
               value={search}
               onChange={(event) => setSearch(event.target.value)}
-              placeholder="Search description, category, currency…"
+              placeholder="Search description, category or currency"
               aria-label="Search transactions"
-              sx={{ flex: 1, minWidth: { lg: 280 } }}
+              sx={{ flex: 1 }}
               slotProps={{
                 input: {
-                  startAdornment: <InputAdornment position="start"><SearchRounded fontSize="small" /></InputAdornment>,
+                  startAdornment: <InputAdornment position="start"><SearchOutlined fontSize="small" /></InputAdornment>,
                 },
               }}
             />
-            <Stack direction={{ xs: "column", sm: "row" }} gap={1.5}>
-              <TextField select label="Type" value={typeFilter} onChange={(event) => setTypeFilter(event.target.value as TypeFilter)} sx={{ minWidth: { sm: 145 } }}>
-                <MenuItem value="all">All types</MenuItem>
-                <MenuItem value="credit">Credits</MenuItem>
-                <MenuItem value="debit">Debits</MenuItem>
-              </TextField>
-              <TextField select label="Group" value={groupFilter} onChange={(event) => setGroupFilter(event.target.value as GroupFilter)} sx={{ minWidth: { sm: 155 } }}>
-                <MenuItem value="all">All groups</MenuItem>
-                <MenuItem value="primary">Primary</MenuItem>
-                <MenuItem value="secondary">Secondary</MenuItem>
-              </TextField>
-            </Stack>
+            <TextField select label="Type" value={typeFilter} onChange={(event) => setTypeFilter(event.target.value as TypeFilter)} sx={{ minWidth: 140 }}>
+              <MenuItem value="all">All types</MenuItem>
+              <MenuItem value="credit">Credits</MenuItem>
+              <MenuItem value="debit">Debits</MenuItem>
+            </TextField>
+            <TextField select label="Group" value={groupFilter} onChange={(event) => setGroupFilter(event.target.value as GroupFilter)} sx={{ minWidth: 140 }}>
+              <MenuItem value="all">All groups</MenuItem>
+              <MenuItem value="primary">Primary</MenuItem>
+              <MenuItem value="secondary">Secondary</MenuItem>
+            </TextField>
           </Stack>
-
           <Divider />
 
           {filteredEntries.length === 0 ? (
-            <Stack alignItems="center" textAlign="center" sx={{ px: 3, py: 7 }}>
-              <Box sx={{ width: 54, height: 54, borderRadius: 3, display: "grid", placeItems: "center", bgcolor: "#EEF4F8", color: "#475467" }}>
-                <ReceiptLongRounded />
-              </Box>
-              <Typography variant="h6" sx={{ mt: 2 }}>
-                {data.entries.length === 0 ? "No transactions yet" : "No matching transactions"}
-              </Typography>
-              <Typography color="text.secondary" variant="body2" sx={{ mt: 0.6, maxWidth: 440 }}>
-                {data.entries.length === 0
-                  ? "Add your first credit or debit to begin building your financial history."
-                  : "Try a different search term or reset the type and group filters."}
-              </Typography>
-              {data.entries.length === 0 && (
-                <Button startIcon={<AddRounded />} onClick={addNew} sx={{ mt: 2 }}>Add transaction</Button>
-              )}
-            </Stack>
+            <EmptyState
+              title={data.entries.length === 0 ? "No transactions yet" : "No matching transactions"}
+              message={
+                data.entries.length === 0
+                  ? "Record your first credit or debit to start building your history."
+                  : "Try a different search term or clear the filters."
+              }
+              action={data.entries.length === 0 ? <Button startIcon={<AddOutlined />} onClick={addNew}>New transaction</Button> : undefined}
+            />
           ) : (
-            <Stack divider={<Divider flexItem />}>
-              {filteredEntries.map((item) => {
-                const isDebtPayment = item.source === "debt_payment";
-                const isCredit = item.type === "credit";
-
-                return (
-                  <Stack
-                    key={item.id}
-                    direction={{ xs: "column", sm: "row" }}
-                    alignItems={{ sm: "center" }}
-                    gap={{ xs: 1.5, sm: 2 }}
-                    sx={{ px: { xs: 2, sm: 2.5 }, py: 2, "&:hover": { bgcolor: "#FBFCFD" } }}
-                  >
-                    <Box sx={{ width: 42, height: 42, borderRadius: 2.5, display: "grid", placeItems: "center", flexShrink: 0, bgcolor: isCredit ? "#EAF8F0" : "#FEF1F1", color: isCredit ? "#15803D" : "#B42318" }}>
-                      {isCredit ? <ArrowUpwardRounded fontSize="small" /> : <ArrowDownwardRounded fontSize="small" />}
-                    </Box>
-                    <Box sx={{ flex: 1, minWidth: 0 }}>
-                      <Stack direction="row" alignItems="center" gap={0.8} flexWrap="wrap">
-                        <Typography fontWeight={750}>{item.description}</Typography>
-                        <Chip size="small" variant="outlined" color={isDebtPayment ? "info" : item.source === "salary" ? "success" : "default"} label={sourceLabel(item)} />
-                      </Stack>
-                      <Stack direction="row" gap={0.8} alignItems="center" flexWrap="wrap" sx={{ mt: 0.45 }}>
-                        <Typography variant="body2" color="text.secondary">{item.date}</Typography>
-                        <Typography variant="body2" color="text.disabled">•</Typography>
-                        <Typography variant="body2" color="text.secondary">{item.category}</Typography>
-                        <Chip size="small" label={item.group} sx={{ height: 22, textTransform: "capitalize" }} />
-                      </Stack>
-                    </Box>
-                    <Typography fontWeight={850} color={isCredit ? "success.main" : "text.primary"} sx={{ minWidth: 145, textAlign: { sm: "right" }, fontVariantNumeric: "tabular-nums" }}>
-                      {isCredit ? "+" : "−"}{formatMoney(item.amount, item.currency)}
-                    </Typography>
-                    <Stack direction="row" alignItems="center" sx={{ alignSelf: { xs: "flex-end", sm: "auto" } }}>
-                      <Tooltip title={isDebtPayment ? "Linked debt payments cannot be edited here" : "Edit transaction"}>
-                        <span>
-                          <IconButton onClick={() => edit(item)} aria-label="Edit transaction" disabled={isDebtPayment} size="small">
-                            <EditRounded fontSize="small" />
-                          </IconButton>
-                        </span>
-                      </Tooltip>
-                      <Tooltip title={isDebtPayment ? "Linked debt payments cannot be deleted here" : "Delete transaction"}>
-                        <span>
-                          <IconButton onClick={() => void remove(item)} aria-label="Delete transaction" disabled={isDebtPayment} size="small">
-                            <DeleteRounded fontSize="small" />
-                          </IconButton>
-                        </span>
-                      </Tooltip>
-                    </Stack>
-                  </Stack>
-                );
-              })}
-            </Stack>
+            <TableContainer>
+              <Table size="small">
+                <TableHead>
+                  <TableRow>
+                    <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>Date</TableCell>
+                    <TableCell>Description</TableCell>
+                    <TableCell sx={{ display: { xs: "none", md: "table-cell" } }}>Category</TableCell>
+                    <TableCell sx={{ display: { xs: "none", lg: "table-cell" } }}>Group</TableCell>
+                    <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>Source</TableCell>
+                    <TableCell align="right">Amount</TableCell>
+                    <TableCell align="right" sx={{ width: 88 }}><Box component="span" sx={visuallyHidden}>Actions</Box></TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {filteredEntries.map((item) => {
+                    const isDebtPayment = item.source === "debt_payment";
+                    return (
+                      <TableRow key={item.id} hover>
+                        <TableCell sx={{ display: { xs: "none", sm: "table-cell" }, whiteSpace: "nowrap", color: "text.secondary" }}>{formatDate(item.date)}</TableCell>
+                        <TableCell sx={{ maxWidth: { xs: 150, sm: 320 } }}>
+                          <Typography variant="body2" noWrap>{item.description}</Typography>
+                          <Typography variant="caption" color="text.secondary" sx={{ display: { sm: "none" } }}>{formatDate(item.date)}</Typography>
+                        </TableCell>
+                        <TableCell sx={{ display: { xs: "none", md: "table-cell" }, color: "text.secondary" }}>{item.category}</TableCell>
+                        <TableCell sx={{ display: { xs: "none", lg: "table-cell" }, color: "text.secondary" }}>{labelOf(item.group)}</TableCell>
+                        <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>
+                          <StatusBadge label={sourceLabel(item)} status={sourceStatus(item)} />
+                        </TableCell>
+                        <TableCell align="right">
+                          <Amount value={formatMoney(item.amount, item.currency)} positive={item.type === "credit"} />
+                        </TableCell>
+                        <TableCell align="right" sx={{ whiteSpace: "nowrap", py: 0.5 }}>
+                          <Tooltip title={isDebtPayment ? "Debt payments can't be edited here" : "Edit"}>
+                            <span>
+                              <IconButton onClick={() => edit(item)} aria-label="Edit transaction" disabled={isDebtPayment} size="small">
+                                <EditOutlined fontSize="small" />
+                              </IconButton>
+                            </span>
+                          </Tooltip>
+                          <Tooltip title={isDebtPayment ? "Debt payments can't be deleted here" : "Delete"}>
+                            <span>
+                              <IconButton onClick={() => void remove(item)} aria-label="Delete transaction" disabled={isDebtPayment} size="small">
+                                <DeleteOutline fontSize="small" />
+                              </IconButton>
+                            </span>
+                          </Tooltip>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </TableContainer>
           )}
-        </CardContent>
-      </Card>
+          {filtersActive && filteredEntries.length > 0 && (
+            <Typography variant="caption" color="text.secondary" sx={{ display: "block", px: 2, py: 1.25, borderTop: 1, borderColor: "divider" }}>
+              Showing {filteredEntries.length} of {data.entries.length} records
+            </Typography>
+          )}
+        </Panel>
+      </Stack>
 
       <Dialog open={open} onClose={() => setOpen(false)} fullWidth maxWidth="sm">
-        <DialogTitle>{editing ? "Edit transaction" : "Add transaction"}</DialogTitle>
+        <DialogTitle>{editing ? "Edit transaction" : "New transaction"}</DialogTitle>
         <Box component="form" onSubmit={form.handleSubmit(submit)}>
           <DialogContent dividers>
             <Grid container spacing={2} sx={{ mt: 0.25 }}>
@@ -397,6 +352,6 @@ export function TransactionsPage() {
           </DialogActions>
         </Box>
       </Dialog>
-    </Stack>
+    </Box>
   );
 }
