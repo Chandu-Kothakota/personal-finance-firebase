@@ -20,9 +20,9 @@ export class ErrorBoundary extends Component<
       return (
         <Box sx={{ maxWidth: 700, mx: "auto", py: 8, px: 2 }}>
           <Alert severity="error">
-            <Typography fontWeight={800}>The dashboard encountered an unexpected error.</Typography>
+            <Typography fontWeight={600}>Something went wrong while showing this page.</Typography>
             <Typography variant="body2" sx={{ mt: 1 }}>
-              Reload the page. Your saved data is not removed.
+              Reload to try again. Your saved data is safe.
             </Typography>
             <Button sx={{ mt: 2 }} variant="outlined" onClick={() => window.location.reload()}>
               Reload

@@ -1,5 +1,6 @@
 import {
   AccountBalanceOutlined,
+  AddOutlined,
   CreditCardOutlined,
   DashboardOutlined,
   LogoutOutlined,
@@ -11,6 +12,7 @@ import {
   AppBar,
   Avatar,
   Box,
+  Button,
   Divider,
   Drawer,
   IconButton,
@@ -18,6 +20,8 @@ import {
   ListItemButton,
   ListItemIcon,
   ListItemText,
+  Menu,
+  MenuItem,
   Stack,
   Toolbar,
   Tooltip,
@@ -25,8 +29,9 @@ import {
   useMediaQuery,
   useTheme,
 } from "@mui/material";
-import { useState } from "react";
-import { NavLink, Outlet, useLocation } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
+import { TransactionDialog } from "./TransactionDialog";
 import { useAuth } from "../context/AuthContext";
 import { colors } from "../theme/theme";
 
@@ -126,9 +131,25 @@ function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
 export function AppShell() {
   const { user, logout } = useAuth();
   const theme = useTheme();
+  const navigate = useNavigate();
   const desktop = useMediaQuery(theme.breakpoints.up("lg"));
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [quickAdd, setQuickAdd] = useState(false);
+  const [menuAnchor, setMenuAnchor] = useState<HTMLElement | null>(null);
   const initials = (user?.email?.[0] ?? "U").toUpperCase();
+
+  // "N" opens a new transaction from anywhere (unless typing in a field or a dialog is open).
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement;
+      if (e.key.toLowerCase() !== "n" || e.metaKey || e.ctrlKey || e.altKey) return;
+      if (target.closest("input, textarea, select, [contenteditable], [role=dialog]")) return;
+      e.preventDefault();
+      setQuickAdd(true);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
 
   return (
     <Box sx={{ minHeight: "100vh", bgcolor: "background.default" }}>
@@ -164,17 +185,58 @@ export function AppShell() {
               </>
             )}
             <Box sx={{ flex: 1 }} />
-            <Typography variant="body2" color="text.secondary" sx={{ display: { xs: "none", sm: "block" } }}>
-              {user?.email}
-            </Typography>
-            <Avatar sx={{ width: 30, height: 30, fontSize: 13, fontWeight: 600, bgcolor: colors.navyTint, color: colors.navy }}>
-              {initials}
-            </Avatar>
-            <Tooltip title="Sign out">
-              <IconButton onClick={() => void logout()} aria-label="Sign out" size="small">
-                <LogoutOutlined fontSize="small" />
-              </IconButton>
+            <Tooltip title="New transaction (N)">
+              <Button
+                variant="contained"
+                size="small"
+                startIcon={<AddOutlined />}
+                onClick={() => setQuickAdd(true)}
+                sx={{ display: { xs: "none", sm: "inline-flex" } }}
+              >
+                New transaction
+              </Button>
             </Tooltip>
+            <IconButton
+              onClick={() => setQuickAdd(true)}
+              aria-label="New transaction"
+              sx={{ display: { xs: "inline-flex", sm: "none" }, bgcolor: "primary.main", color: "#fff", "&:hover": { bgcolor: "primary.dark" } }}
+              size="small"
+            >
+              <AddOutlined fontSize="small" />
+            </IconButton>
+            <IconButton
+              onClick={(e) => setMenuAnchor(e.currentTarget)}
+              aria-label="Account menu"
+              aria-haspopup="menu"
+              aria-expanded={menuAnchor ? "true" : undefined}
+              sx={{ ml: 0.5, p: 0.25 }}
+            >
+              <Avatar sx={{ width: 32, height: 32, fontSize: 13, fontWeight: 600, bgcolor: colors.navyTint, color: colors.navy }}>
+                {initials}
+              </Avatar>
+            </IconButton>
+            <Menu
+              anchorEl={menuAnchor}
+              open={Boolean(menuAnchor)}
+              onClose={() => setMenuAnchor(null)}
+              anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
+              transformOrigin={{ vertical: "top", horizontal: "right" }}
+              slotProps={{ paper: { sx: { mt: 1, minWidth: 220, border: 1, borderColor: "divider", boxShadow: "0 8px 24px rgba(16,24,40,.10)" } } }}
+            >
+              <Box sx={{ px: 2, py: 1.25 }}>
+                <Typography variant="caption" color="text.secondary">Signed in as</Typography>
+                <Typography variant="body2" fontWeight={600} noWrap>{user?.email}</Typography>
+              </Box>
+              <Divider />
+              <MenuItem onClick={() => { setMenuAnchor(null); navigate("/settings"); }}>
+                <ListItemIcon><SettingsOutlined fontSize="small" /></ListItemIcon>
+                Settings
+              </MenuItem>
+              <MenuItem onClick={() => { setMenuAnchor(null); void logout(); }}>
+                <ListItemIcon><LogoutOutlined fontSize="small" /></ListItemIcon>
+                Sign out
+              </MenuItem>
+            </Menu>
           </Toolbar>
         </AppBar>
 
@@ -182,6 +244,8 @@ export function AppShell() {
           <Outlet />
         </Box>
       </Box>
+
+      <TransactionDialog open={quickAdd} entry={null} onClose={() => setQuickAdd(false)} />
     </Box>
   );
 }

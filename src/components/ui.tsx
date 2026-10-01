@@ -1,4 +1,4 @@
-import { Box, Card, Chip, Divider, Stack, Typography, type SxProps, type Theme } from "@mui/material";
+import { Box, Card, CardActionArea, Chip, Divider, Stack, Typography, type SxProps, type Theme } from "@mui/material";
 import type { ReactNode } from "react";
 import { colors } from "../theme/theme";
 
@@ -68,28 +68,60 @@ export function Panel({
   );
 }
 
-/** A single headline figure with a label and optional supporting line. */
+export type Trend = { label: string; tone: "positive" | "negative" | "neutral" };
+
+/** A single headline figure with a label, optional trend and supporting line. */
 export function StatCard({
   label,
   value,
   caption,
+  trend,
   tone = "default",
+  onClick,
 }: {
   label: string;
   value: string;
   caption?: string;
+  trend?: Trend;
   tone?: "default" | "positive" | "negative";
+  onClick?: () => void;
 }) {
   const valueColor = tone === "positive" ? colors.positive : tone === "negative" ? colors.negative : colors.text;
-  return (
-    <Card sx={{ height: "100%", p: 2.25 }}>
+  const trendColor = trend?.tone === "positive" ? colors.positive : trend?.tone === "negative" ? colors.negative : colors.textSecondary;
+  const body = (
+    <>
       <Typography variant="overline" color="text.secondary" component="p">{label}</Typography>
-      <Typography sx={{ mt: 0.5, fontSize: "1.5rem", fontWeight: 600, color: valueColor, fontVariantNumeric: "tabular-nums" }} noWrap>
+      <Typography sx={{ mt: 0.5, fontSize: { xs: "1.2rem", sm: "1.5rem" }, fontWeight: 600, color: valueColor, fontVariantNumeric: "tabular-nums" }} noWrap>
         {value}
       </Typography>
-      {caption && <Typography variant="caption" color="text.secondary">{caption}</Typography>}
+      <Typography variant="caption" color="text.secondary" component="p" noWrap>
+        {trend && <Box component="span" sx={{ color: trendColor, fontWeight: 600, mr: 0.75 }}>{trend.label}</Box>}
+        {caption}
+      </Typography>
+    </>
+  );
+  return (
+    <Card sx={{ height: "100%" }}>
+      {onClick ? (
+        <CardActionArea onClick={onClick} sx={{ p: { xs: 1.75, sm: 2.25 }, height: "100%" }}>{body}</CardActionArea>
+      ) : (
+        <Box sx={{ p: { xs: 1.75, sm: 2.25 } }}>{body}</Box>
+      )}
     </Card>
   );
+}
+
+/** Percent change between two amounts, phrased for a stat card. `upIsGood` sets the color. */
+export function trendBetween(current: number, previous: number, previousLabel: string, upIsGood: boolean): Trend | undefined {
+  if (previous <= 0 && current <= 0) return undefined;
+  if (previous <= 0) return { label: "New", tone: "neutral" };
+  const change = ((current - previous) / previous) * 100;
+  if (Math.abs(change) < 0.5) return { label: `Same as ${previousLabel}`, tone: "neutral" };
+  const up = change > 0;
+  return {
+    label: `${up ? "▲" : "▼"} ${Math.abs(change).toFixed(0)}% vs ${previousLabel}`,
+    tone: up === upIsGood ? "positive" : "negative",
+  };
 }
 
 const STATUS = {
@@ -131,3 +163,12 @@ export function Amount({ value, positive }: { value: string; positive: boolean }
 }
 
 export const labelOf = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+
+/** Segmented-control styling for full-width ToggleButtonGroups in forms. */
+export const toggleSx = {
+  "& .MuiToggleButton-root": { flex: 1, textTransform: "none", fontWeight: 600, py: 0.75 },
+  "& .MuiToggleButton-root.Mui-selected, & .MuiToggleButton-root.Mui-selected:hover": {
+    bgcolor: "primary.main",
+    color: "#fff",
+  },
+};

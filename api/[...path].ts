@@ -211,6 +211,12 @@ async function route(req: VercelRequest, uid: string, email: string | null) {
     }
   }
 
+  if (resource === "salary-profiles" && method === "DELETE" && id) {
+    // Salary credits already recorded stay in the ledger.
+    await sql`DELETE FROM salary_profiles WHERE id = ${id} AND uid = ${uid}`;
+    return { ok: true };
+  }
+
   if (resource === "salary-profiles" && (method === "POST" || (method === "PUT" && id))) {
     const b = asBody(req.body);
     const days = payDays(b);

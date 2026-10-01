@@ -58,6 +58,12 @@ export const appTheme = createTheme({
           backgroundColor: colors.canvas,
           WebkitFontSmoothing: "antialiased",
         },
+        // Plain number fields (no spinner arrows).
+        "input[type=number]": { MozAppearance: "textfield" },
+        "input[type=number]::-webkit-outer-spin-button, input[type=number]::-webkit-inner-spin-button": {
+          WebkitAppearance: "none",
+          margin: 0,
+        },
       },
     },
     MuiPaper: {
