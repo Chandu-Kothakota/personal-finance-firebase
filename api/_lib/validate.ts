@@ -1,4 +1,4 @@
-import { HttpError } from "./auth";
+import { HttpError } from "./auth.js";
 
 const CURRENCIES = ["USD", "INR", "CAD", "EUR", "GBP"];
 const GROUPS = ["primary", "secondary"];

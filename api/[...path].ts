@@ -1,9 +1,9 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { randomUUID } from "node:crypto";
-import { authenticate, HttpError } from "./_lib/auth";
-import { sql } from "./_lib/db";
-import { materializeSalaryCreditsStatement } from "./_lib/salary";
-import { asBody, currency, group, isoDate, num, oneOf, payDays, str } from "./_lib/validate";
+import { authenticate, HttpError } from "./_lib/auth.js";
+import { sql } from "./_lib/db.js";
+import { materializeSalaryCreditsStatement } from "./_lib/salary.js";
+import { asBody, currency, group, isoDate, num, oneOf, payDays, str } from "./_lib/validate.js";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 type Row = Record<string, any>;

@@ -1,4 +1,4 @@
-import { sql } from "./db";
+import { sql } from "./db.js";
 
 /**
  * Statement that creates any missing salary credits up to `today` (yyyy-MM-dd, the client's
