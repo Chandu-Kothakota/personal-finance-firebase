@@ -54,10 +54,12 @@ const toProfile = (r: Row) => ({
 
 async function route(req: VercelRequest, uid: string, email: string | null) {
   const method = req.method ?? "GET";
-  const segments = new URL(req.url ?? "", "http://x").pathname
-    .replace(/^\/api\/?/, "")
-    .split("/")
-    .filter(Boolean);
+  // vercel.json rewrites /api/<route> to /api?route=<route> (Vercel's file routing can't
+  // match nested paths like debts/<id>/payment for a non-Next app).
+  const route = typeof req.query.route === "string"
+    ? req.query.route
+    : new URL(req.url ?? "", "http://x").pathname.replace(/^\/api\/?/, "");
+  const segments = route.split("/").filter(Boolean);
   const [resource, id, action] = segments;
 
   // GET /api/data — everything the app needs, in one round trip.
