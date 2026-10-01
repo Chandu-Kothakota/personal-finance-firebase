@@ -7,7 +7,7 @@ A single-user personal finance web app.
 - React + TypeScript + Vite, Material UI, Recharts
 - Firebase Authentication (email/password) for login only
 - Neon Postgres for all data, accessed through one Vercel serverless function
-  (`api/[...path].ts`) that verifies the Firebase ID token and scopes every query to that user
+  (`api/index.ts`, with `vercel.json` routing `/api/*` to it) that verifies the Firebase ID token and scopes every query to that user
 - Vercel for hosting (static frontend + `/api`)
 - GitHub Actions CI; Vercel's GitHub integration deploys previews per PR and production from `main`
 - Frankfurter daily FX reference-rate API (fetched from the browser, cached 12 hours)
