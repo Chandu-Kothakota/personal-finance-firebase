@@ -1,245 +1,92 @@
-# My Finance — Firebase Personal Finance Dashboard
+# My Finance — Personal Finance Dashboard
 
-A frontend-first, single-user personal finance web app.
+A single-user personal finance web app.
 
 ## Architecture
 
-- React + TypeScript + Vite
-- Material UI
-- Recharts
-- Firebase Authentication (email/password)
-- Neon Postgres (serverless driver)
-- Vercel (static hosting + `/api` serverless function)
-- Frankfurter daily FX reference-rate API
-- API: a single Vercel function in `api/[...path].ts` that verifies the Firebase ID token and scopes every query to that user
+- React + TypeScript + Vite, Material UI, Recharts
+- Firebase Authentication (email/password) for login only
+- Neon Postgres for all data, accessed through one Vercel serverless function
+  (`api/[...path].ts`) that verifies the Firebase ID token and scopes every query to that user
+- Vercel for hosting (static frontend + `/api`)
+- GitHub Actions CI; Vercel's GitHub integration deploys previews per PR and production from `main`
+- Frankfurter daily FX reference-rate API (fetched from the browser, cached 12 hours)
+
+```text
+browser ──(Firebase ID token)──▶ /api/*  ──▶ Neon Postgres
+   └── Firebase Auth (login)
+```
 
 ## Features
 
-- Private login
-- No public registration screen
+- Private login, no public registration
 - Primary and secondary income/debt grouping
-- Recurring salary profile with effective date and up to two monthly pay days
-- Automatic missing salary-credit creation when the signed-in app starts/refreshes
+- Recurring salary profiles with an effective date and up to two monthly pay days
 - Manual credit/debit transactions
-- Debt tracking for credit cards, loans and miscellaneous balances
-- Atomic debt payments that reduce a balance and create a linked ledger debit
-- Multiple currencies including USD/INR/CAD
-- Dashboard totals converted into a selectable base currency
-- Category expense chart
-- Primary vs secondary chart
-- Edit/delete support
-- Per-user data isolation enforced server-side (every query filters by the verified uid)
-- FX cache with stale-data fallback
-- Error boundary and user-facing exception handling
+- Debt tracking (credit cards, loans, misc) with atomic payments that reduce the balance and
+  create a linked ledger debit
+- Multiple currencies (USD/INR/CAD/EUR/GBP) converted to a selectable base currency
+- Overview with totals, category and primary-vs-secondary charts
+- Per-user isolation enforced server-side
 
 ## Salary auto-credit behavior
 
-There is no scheduled job. The API does this whenever the app loads data:
+There is no scheduled job. Whenever the app loads data, the API (in the same database
+transaction as the reads) creates any missing salary credits:
 
-1. Read active salary profiles.
-2. Calculate every expected occurrence for one or two configured pay days from
-   `effectiveDate` through today. A day beyond the end of a month uses that month's
-   last valid day.
-3. Build a unique occurrence key.
-4. Skip occurrences already present.
-5. Insert each missing salary credit (`ON CONFLICT DO NOTHING`, so it is idempotent).
+1. For each active profile, compute every expected pay date from `effectiveDate` through today.
+   A pay day beyond a month's end uses that month's last day. Future dates are never created.
+2. Each credit has a deterministic id and occurrence key; inserts use `ON CONFLICT DO NOTHING`,
+   so it is idempotent.
 
-Therefore, if the app is not opened on the 15th, the salary appears automatically next time you sign in.
-Future pay dates are never materialized early.
+If the app isn't opened on the 15th, the salary appears the next time you sign in.
 
-## Firebase setup
-
-### 1. Create a Firebase project
-
-Use the Spark/no-cost plan.
-
-### 2. Add a Web App
-
-Copy the Firebase web configuration values.
-
-### 3. Enable Authentication
-
-Authentication -> Sign-in method -> Email/Password -> Enable.
-
-Do not add a public registration page. Instead create your single user manually in:
-Authentication -> Users -> Add user.
-
-### 4. Create Firestore
-
-Create a Cloud Firestore database in Native mode.
-
-Deploy the included rules:
+## Local development
 
 ```bash
-npm install -g firebase-tools
-firebase login
-firebase use YOUR_PROJECT_ID
-firebase deploy --only firestore:rules
-```
-
-### 5. Local environment
-
-Copy:
-
-```bash
-cp .env.example .env.local
-```
-
-Populate every `VITE_FIREBASE_*` value.
-
-### 6. Install and run
-
-```bash
+cp .env.example .env.local     # fill in VITE_FIREBASE_* and DATABASE_URL
 npm install
-npm run dev
+npm run db:migrate             # create tables in your Neon database (idempotent)
+npx vercel dev                 # frontend + /api together
 ```
 
-### 7. Production build
+`npm run dev` runs the frontend only (no `/api`), so use `vercel dev` for anything that loads data.
+`localhost` is an allowed Firebase Auth domain by default.
 
-```bash
-npm run build
-```
+## Database
 
-## Firebase Hosting setup
+Schema: `db/schema.sql` (tables: `users`, `entries`, `debts`, `salary_profiles`).
+`users` also holds the base currency and display name.
 
-```bash
-firebase login
-firebase use YOUR_PROJECT_ID
-firebase deploy --only hosting
-```
-
-`firebase.json` already rewrites all routes to `index.html`.
-
-## GitHub deployment
-
-The workflow is:
-
-`.github/workflows/firebase-hosting.yml`
-
-Add these GitHub repository secrets:
-
-- `VITE_FIREBASE_API_KEY`
-- `VITE_FIREBASE_AUTH_DOMAIN`
-- `VITE_FIREBASE_PROJECT_ID`
-- `VITE_FIREBASE_STORAGE_BUCKET`
-- `VITE_FIREBASE_MESSAGING_SENDER_ID`
-- `VITE_FIREBASE_APP_ID`
-- `FIREBASE_SERVICE_ACCOUNT`
-
-Optional repository variable:
-
-- `VITE_BASE_CURRENCY=USD`
-
-The easiest way to generate the official Firebase Hosting GitHub integration and service-account secret is also:
-
-```bash
-firebase init hosting:github
-```
-
-You can compare the generated workflow with the included one and keep only one.
-
-## Firestore shape
-
-```text
-users/{uid}
-  entries/{entryId}
-  debts/{debtId}
-  salaryProfiles/{profileId}
-  settings/preferences
-```
-
-All subcollections are restricted to the authenticated user's own UID.
-
-Salary profiles use `payDays` for the current one-or-two-day schedule and retain
-`payDay` as a compatibility field. Existing documents that contain only `payDay`
-continue to materialize normally without a migration.
-
-Debt-payment entries use `source: "debt_payment"` and store the linked `debtId`.
-The debt balance update and entry creation are committed in one Firestore transaction.
-
-## Notes about exchange rates
-
-FX rates are fetched directly from the public Frankfurter API from the browser and cached locally for 12 hours.
-
-They are reference rates, not intraday trading quotes. If the API is temporarily unavailable, the app uses the last locally cached rate when possible.
-
-## Suggested first data
-
-1. Settings -> choose base currency.
-2. Earnings -> create `Primary Salary`.
-3. Set amount, currency, effective date, and pay day `15`.
-4. Debts -> add each INR/CAD/USD credit-card balance.
-5. Transactions -> add expenses and secondary earnings.
-6. Summary -> review total and category charts.
-
-## Security notes
-
-Firebase web configuration is not treated as a secret. Data protection is enforced by Authentication plus Firestore Security Rules.
-
-The UI contains no signup route. For a one-person app, create exactly one Authentication user in Firebase Console.
-
-Never change the Firestore rules to `allow read, write: if true`.
-
-## v1.0.1 fixes
-
-- Added `@emotion/react` and `@emotion/styled` required by Material UI.
-- Added `vite.config.ts`.
-- Added TypeScript project configuration files.
-- Enabled the modern React JSX runtime.
-- Kept `.env.example` as a safe template; use `.env.local` for your real Firebase values.
-
-## v1.0.2 fixes
-
-- Corrected React Hook Form + Zod 4 input/output generics for Transactions, Debts, and Earnings forms.
-- Resolves the production TypeScript `handleSubmit` / resolver incompatibility errors.
-- Keeps numeric coercion and runtime validation intact.
-
-## Enterprise UI refresh — v2.1.0
-
-This version preserves the existing Firebase Authentication, Firestore, salary materialization,
-multi-currency conversion, debt tracking, and transaction behavior while replacing the original
-starter-style interface with a production-oriented application experience.
-
-### UI/UX upgrades
-
-- Dark enterprise navigation rail with responsive mobile drawer
-- Professional sticky account header and secured-workspace treatment
-- Redesigned login experience with a private-finance product presentation
-- Executive-style financial overview hero with net financial position
-- KPI cards for credits, debt portfolio, recorded expenses, and net position
-- Financial coverage indicator
-- Primary-vs-secondary portfolio chart
-- Refined category-spend visualization
-- Recent-activity panel
-- Portfolio snapshot cards
-- Centralized MUI enterprise theme for typography, controls, cards, dialogs, and spacing
-- Responsive desktop/tablet/mobile behavior
-- Existing functional pages automatically inherit the new theme and application shell
-
-### Merge notes
-
-Keep your existing `.env.local` locally. It is intentionally not included in this package.
-The Firebase configuration, Firestore rules, and GitHub workflows from the supplied project are retained.
-
-
-## Database (Neon Postgres)
-
-Schema lives in `db/schema.sql`.
+To copy data from an old Firestore project (one-off, idempotent):
 
 ```bash
 export DATABASE_URL='postgres://…neon.tech/neondb?sslmode=require'
-npm run db:migrate                                   # create tables (idempotent)
-
-# one-off: copy existing Firestore data into Neon
 export GOOGLE_APPLICATION_CREDENTIALS=/path/to/service-account.json
-npm run import:firestore -- --dry-run                # preview counts
-npm run import:firestore                             # import (safe to re-run)
+npm run import:firestore -- --dry-run
+npm run import:firestore
 ```
 
-Salary credits are now created server-side when the app loads data (`api/_lib/salary.ts`), using the same deterministic ids/keys as before so imported history is not duplicated.
+Delete the service-account key afterwards.
 
-## Deploying on Vercel
+## Deployment
 
-1. Import the GitHub repo in Vercel (framework preset: Vite).
-2. Add env vars: all `VITE_FIREBASE_*`, `VITE_BASE_CURRENCY`, and `DATABASE_URL`.
-3. In Firebase console → Authentication → Settings → Authorized domains, add your Vercel domain.
+- **Production:** every merge to `main` deploys automatically on Vercel.
+- **Previews:** every PR gets a preview URL. Firebase Auth only allows listed domains, so add a
+  preview URL under Authentication → Settings → Authorized domains before logging in there.
+- **Vercel environment variables:** all `VITE_FIREBASE_*`, `VITE_BASE_CURRENCY`, and `DATABASE_URL`
+  (secret; never give it a `VITE_` prefix).
+- **CI** (`.github/workflows/ci.yml`): type-checks the app, API and scripts, builds the frontend,
+  and applies the schema to a clean Postgres twice.
+
+## Security notes
+
+- Firebase web config is not a secret; data protection comes from server-side token verification
+  and per-uid query filtering in the API.
+- The UI has no signup route. Create your single user in Firebase Console → Authentication → Users.
+- Keep `DATABASE_URL` and any service-account keys out of git.
+
+## Exchange rates
+
+Rates are reference rates, not intraday quotes. If the API is unavailable, the last cached rate
+is used when possible.
