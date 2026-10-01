@@ -38,7 +38,7 @@ import { useAuth } from "../context/AuthContext";
 import { useFinanceData } from "../hooks/useFinanceData";
 import { CURRENCIES, formatMoney } from "../lib/currency";
 import { toUserMessage } from "../lib/errors";
-import { deleteEntry, saveEntry } from "../services/firestoreService";
+import { deleteEntry, saveEntry } from "../services/apiService";
 import type { LedgerEntry } from "../types";
 
 const schema = z.object({
@@ -137,7 +137,6 @@ export function TransactionsPage() {
     setError("");
     try {
       await saveEntry(
-        user.uid,
         { ...values, source: editing?.source ?? "manual" },
         editing?.id,
       );
@@ -155,7 +154,7 @@ export function TransactionsPage() {
     }
     if (!user || !window.confirm("Delete this transaction?")) return;
     try {
-      await deleteEntry(user.uid, item.id);
+      await deleteEntry(item.id);
       await data.refresh();
     } catch (err) {
       setError(toUserMessage(err));

@@ -1,10 +1,5 @@
 import { initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
-import {
-  initializeFirestore,
-  persistentLocalCache,
-  persistentMultipleTabManager,
-} from "firebase/firestore";
 
 const required = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -24,8 +19,3 @@ for (const [key, value] of Object.entries(required)) {
 const app = initializeApp(required);
 
 export const auth = getAuth(app);
-export const db = initializeFirestore(app, {
-  localCache: persistentLocalCache({
-    tabManager: persistentMultipleTabManager(),
-  }),
-});

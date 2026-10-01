@@ -2,15 +2,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useAuth } from "../context/AuthContext";
 import { convertToBase } from "../lib/currency";
 import { toUserMessage } from "../lib/errors";
-import {
-  getSettings,
-  listDebts,
-  listEntries,
-  listSalaryProfiles,
-  saveSettings,
-} from "../services/firestoreService";
+import { loadFinanceData, saveSettings } from "../services/apiService";
 import { getFxRates } from "../services/fxService";
-import { materializeSalaryCredits } from "../services/salaryService";
 import type {
   Debt,
   FxRates,
@@ -36,27 +29,14 @@ export function useFinanceDataState() {
     setError("");
 
     try {
-      const prefs = await getSettings(user.uid);
+      const snapshot = await loadFinanceData();
+      const rates = await getFxRates(snapshot.settings.baseCurrency);
 
-      const [profiles, debtRows, entryRows, rates] = await Promise.all([
-        listSalaryProfiles(user.uid),
-        listDebts(user.uid),
-        listEntries(user.uid),
-        getFxRates(prefs.baseCurrency),
-      ]);
-
-      setSettings(prefs);
-      setSalaryProfiles(profiles);
-      setDebts(debtRows);
-      setEntries(entryRows);
+      setSettings(snapshot.settings);
+      setSalaryProfiles(snapshot.salaryProfiles);
+      setDebts(snapshot.debts);
+      setEntries(snapshot.entries);
       setFx(rates);
-      setLoading(false);
-
-      const existingKeys = new Set(
-        entryRows.flatMap((e) => (e.salaryOccurrenceKey ? [e.salaryOccurrenceKey] : [])),
-      );
-      const created = await materializeSalaryCredits(user.uid, profiles, existingKeys);
-      if (created > 0) setEntries(await listEntries(user.uid));
     } catch (err) {
       setError(toUserMessage(err));
     } finally {
@@ -141,7 +121,7 @@ export function useFinanceDataState() {
     async (baseCurrency: UserSettings["baseCurrency"]) => {
       if (!user) return;
       const next = { ...settings, baseCurrency };
-      await saveSettings(user.uid, next);
+      await saveSettings(next);
       setSettings(next);
       setFx(await getFxRates(baseCurrency));
     },

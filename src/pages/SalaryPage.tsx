@@ -38,7 +38,7 @@ import { useAuth } from "../context/AuthContext";
 import { useFinanceData } from "../hooks/useFinanceData";
 import { CURRENCIES, convertToBase, formatMoney } from "../lib/currency";
 import { toUserMessage } from "../lib/errors";
-import { saveSalaryProfile } from "../services/firestoreService";
+import { saveSalaryProfile } from "../services/apiService";
 import { getSalaryPayDays } from "../services/salaryService";
 import type { SalaryProfile } from "../types";
 
@@ -129,7 +129,6 @@ export function SalaryPage() {
       setError("");
       const { payDay1, payDay2, ...profile } = values;
       await saveSalaryProfile(
-        user.uid,
         {
           ...profile,
           payDays: payDay2 === undefined ? [payDay1] : [payDay1, payDay2],

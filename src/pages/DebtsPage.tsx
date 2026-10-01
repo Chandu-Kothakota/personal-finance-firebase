@@ -39,8 +39,7 @@ import { useAuth } from "../context/AuthContext";
 import { useFinanceData } from "../hooks/useFinanceData";
 import { CURRENCIES, formatMoney } from "../lib/currency";
 import { toUserMessage } from "../lib/errors";
-import { makeDebtPayment } from "../services/debtService";
-import { deleteDebt, saveDebt } from "../services/firestoreService";
+import { deleteDebt, makeDebtPayment, saveDebt } from "../services/apiService";
 import type { Debt, DebtKind, LedgerGroup } from "../types";
 
 const schema = z.object({
@@ -170,7 +169,7 @@ export function DebtsPage() {
     if (!user) return;
     try {
       setError("");
-      await saveDebt(user.uid, values, editing?.id);
+      await saveDebt(values, editing?.id);
       setOpen(false);
       await data.refresh();
     } catch (err) {
@@ -181,7 +180,7 @@ export function DebtsPage() {
   async function remove(id: string) {
     if (!user || !window.confirm("Delete this debt?")) return;
     try {
-      await deleteDebt(user.uid, id);
+      await deleteDebt(id);
       await data.refresh();
     } catch (err) {
       setError(toUserMessage(err));
@@ -210,7 +209,7 @@ export function DebtsPage() {
     setPaymentProcessing(true);
     setPaymentError("");
     try {
-      await makeDebtPayment(user.uid, paymentDebt.id, values);
+      await makeDebtPayment(paymentDebt.id, values);
       setPaymentDebt(null);
       await data.refresh();
     } catch (err) {
