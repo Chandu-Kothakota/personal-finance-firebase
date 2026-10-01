@@ -1,22 +1,9 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import {
-  AccountBalanceRounded,
-  AddRounded,
-  CheckCircleRounded,
-  CreditCardRounded,
-  DeleteRounded,
-  EditRounded,
-  PaymentsRounded,
-  ReceiptLongRounded,
-  SearchRounded,
-} from "@mui/icons-material";
+import { AddOutlined, DeleteOutline, EditOutlined, SearchOutlined } from "@mui/icons-material";
 import {
   Alert,
   Box,
   Button,
-  Card,
-  CardContent,
-  Chip,
   Dialog,
   DialogActions,
   DialogContent,
@@ -27,14 +14,22 @@ import {
   InputAdornment,
   MenuItem,
   Stack,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
   TextField,
   Tooltip,
   Typography,
 } from "@mui/material";
-import { useRef, useState, type ReactNode } from "react";
+import { visuallyHidden } from "@mui/utils";
+import { useRef, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { z } from "zod";
 import { LoadingScreen } from "../components/LoadingScreen";
+import { EmptyState, PageHeader, Panel, StatCard, StatusBadge, labelOf } from "../components/ui";
 import { useAuth } from "../context/AuthContext";
 import { useFinanceData } from "../hooks/useFinanceData";
 import { CURRENCIES, formatMoney } from "../lib/currency";
@@ -86,10 +81,10 @@ const paymentDefaults: PaymentFormData = {
   date: new Date().toISOString().slice(0, 10),
 };
 
-const debtKindDetails: Record<DebtKind, { label: string; icon: ReactNode; color: string; background: string }> = {
-  credit_card: { label: "Credit card", icon: <CreditCardRounded />, color: "#7C3AED", background: "#F3EEFF" },
-  loan: { label: "Loan", icon: <AccountBalanceRounded />, color: "#2563EB", background: "#EAF1FF" },
-  misc: { label: "Other debt", icon: <ReceiptLongRounded />, color: "#D97706", background: "#FFF5E7" },
+const debtKindLabel: Record<DebtKind, string> = {
+  credit_card: "Credit card",
+  loan: "Loan",
+  misc: "Other",
 };
 
 function isPaid(debt: Debt): boolean {
@@ -127,7 +122,7 @@ export function DebtsPage() {
       debt.name,
       debt.category,
       debt.currency,
-      debtKindDetails[debt.kind].label,
+      debtKindLabel[debt.kind],
     ].some((value) => value.toLowerCase().includes(normalizedSearch));
 
     return matchesGroup && matchesStatus && matchesSearch;
@@ -227,174 +222,121 @@ export function DebtsPage() {
   const base = data.settings.baseCurrency;
 
   return (
-    <Stack spacing={3}>
-      <Stack direction={{ xs: "column", md: "row" }} justifyContent="space-between" alignItems={{ md: "center" }} gap={2}>
-        <Box>
-          <Typography variant="h4">Debt portfolio</Typography>
-          <Typography color="text.secondary" sx={{ mt: 0.6 }}>
-            Monitor outstanding balances and make payments without losing ledger history.
-          </Typography>
-        </Box>
-        <Button variant="contained" startIcon={<AddRounded />} onClick={newDebt} sx={{ alignSelf: { xs: "flex-start", md: "auto" } }}>
-          Add debt
-        </Button>
-      </Stack>
+    <Box>
+      <PageHeader
+        title="Debts"
+        description="Outstanding balances across cards, loans and other accounts."
+        actions={
+          <Button variant="contained" startIcon={<AddOutlined />} onClick={newDebt}>
+            New debt account
+          </Button>
+        }
+      />
 
-      {error && <Alert severity="error">{error}</Alert>}
-      {data.error && <Alert severity="error">{data.error}</Alert>}
+      <Stack spacing={2}>
+        {error && <Alert severity="error">{error}</Alert>}
+        {data.error && <Alert severity="error">{data.error}</Alert>}
 
-      <Grid container spacing={2}>
-        <Grid size={{ xs: 12, lg: 6 }}>
-          <Card sx={{ height: "100%", border: "1px solid #E6EAF0", background: "linear-gradient(135deg, #E4F5F2 0%, #F3F6F9 65%)" }}>
-            <CardContent sx={{ p: 3, "&:last-child": { pb: 3 } }}>
-              <Stack direction="row" justifyContent="space-between" alignItems="flex-start" gap={2}>
-                <Box>
-                  <Typography variant="overline" sx={{ color: "text.secondary", fontWeight: 800, letterSpacing: ".09em" }}>TOTAL OUTSTANDING</Typography>
-                  <Typography variant="h4" sx={{ mt: 0.7, color: "#0B1F33", fontVariantNumeric: "tabular-nums" }}>
-                    {formatMoney(data.summary.debtBalances, base)}
-                  </Typography>
-                  <Typography variant="body2" sx={{ mt: 1, color: "text.secondary" }}>
-                    Consolidated portfolio balance in {base}
-                  </Typography>
-                </Box>
-                <Box sx={{ width: 46, height: 46, borderRadius: 3, display: "grid", placeItems: "center", bgcolor: "rgba(15,118,110,.12)", color: "#0F766E" }}>
-                  <AccountBalanceRounded />
-                </Box>
-              </Stack>
-            </CardContent>
-          </Card>
+        <Grid container spacing={2}>
+          <Grid size={{ xs: 12, sm: 4 }}>
+            <StatCard label="Total outstanding" value={formatMoney(data.summary.debtBalances, base)} caption={`Converted to ${base}`} />
+          </Grid>
+          <Grid size={{ xs: 12, sm: 4 }}>
+            <StatCard label="Open accounts" value={String(outstandingDebts.length)} caption="With a balance due" />
+          </Grid>
+          <Grid size={{ xs: 12, sm: 4 }}>
+            <StatCard label="Paid off" value={String(paidDebts.length)} caption="Zero balance" />
+          </Grid>
         </Grid>
-        <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
-          <Card sx={{ height: "100%" }}>
-            <CardContent sx={{ p: 2.5, "&:last-child": { pb: 2.5 } }}>
-              <Box sx={{ width: 40, height: 40, borderRadius: 2.5, display: "grid", placeItems: "center", bgcolor: "#FFF5E7", color: "#D97706" }}><PaymentsRounded /></Box>
-              <Typography variant="h5" sx={{ mt: 2 }}>{outstandingDebts.length}</Typography>
-              <Typography variant="body2" color="text.secondary" sx={{ mt: 0.4 }}>Outstanding account{outstandingDebts.length === 1 ? "" : "s"}</Typography>
-            </CardContent>
-          </Card>
-        </Grid>
-        <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
-          <Card sx={{ height: "100%" }}>
-            <CardContent sx={{ p: 2.5, "&:last-child": { pb: 2.5 } }}>
-              <Box sx={{ width: 40, height: 40, borderRadius: 2.5, display: "grid", placeItems: "center", bgcolor: "#EAF8F0", color: "#15803D" }}><CheckCircleRounded /></Box>
-              <Typography variant="h5" sx={{ mt: 2 }}>{paidDebts.length}</Typography>
-              <Typography variant="body2" color="text.secondary" sx={{ mt: 0.4 }}>Paid-off account{paidDebts.length === 1 ? "" : "s"}</Typography>
-            </CardContent>
-          </Card>
-        </Grid>
-      </Grid>
 
-      <Card>
-        <CardContent sx={{ p: 2.5, "&:last-child": { pb: 2.5 } }}>
-          <Stack direction={{ xs: "column", lg: "row" }} gap={1.5}>
+        <Panel flush>
+          <Stack direction={{ xs: "column", md: "row" }} gap={1.5} sx={{ p: 2 }}>
             <TextField
               value={search}
               onChange={(event) => setSearch(event.target.value)}
-              placeholder="Search account, category, or currency…"
-              aria-label="Search debt portfolio"
+              placeholder="Search account, category or currency"
+              aria-label="Search debts"
               sx={{ flex: 1 }}
-              slotProps={{ input: { startAdornment: <InputAdornment position="start"><SearchRounded fontSize="small" /></InputAdornment> } }}
+              slotProps={{ input: { startAdornment: <InputAdornment position="start"><SearchOutlined fontSize="small" /></InputAdornment> } }}
             />
-            <Stack direction={{ xs: "column", sm: "row" }} gap={1.5}>
-              <TextField select label="Group" value={groupFilter} onChange={(event) => setGroupFilter(event.target.value as GroupFilter)} sx={{ minWidth: { sm: 150 } }}>
-                <MenuItem value="all">All groups</MenuItem>
-                <MenuItem value="primary">Primary</MenuItem>
-                <MenuItem value="secondary">Secondary</MenuItem>
-              </TextField>
-              <TextField select label="Status" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as StatusFilter)} sx={{ minWidth: { sm: 165 } }}>
-                <MenuItem value="all">All statuses</MenuItem>
-                <MenuItem value="outstanding">Outstanding</MenuItem>
-                <MenuItem value="paid">Paid off</MenuItem>
-              </TextField>
-            </Stack>
+            <TextField select label="Group" value={groupFilter} onChange={(event) => setGroupFilter(event.target.value as GroupFilter)} sx={{ minWidth: 140 }}>
+              <MenuItem value="all">All groups</MenuItem>
+              <MenuItem value="primary">Primary</MenuItem>
+              <MenuItem value="secondary">Secondary</MenuItem>
+            </TextField>
+            <TextField select label="Status" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as StatusFilter)} sx={{ minWidth: 150 }}>
+              <MenuItem value="all">All statuses</MenuItem>
+              <MenuItem value="outstanding">Outstanding</MenuItem>
+              <MenuItem value="paid">Paid off</MenuItem>
+            </TextField>
           </Stack>
-        </CardContent>
-      </Card>
+          <Divider />
 
-      {filteredDebts.length === 0 ? (
-        <Card>
-          <CardContent>
-            <Stack alignItems="center" textAlign="center" sx={{ py: 5 }}>
-              <Box sx={{ width: 56, height: 56, borderRadius: 3, display: "grid", placeItems: "center", bgcolor: "#EEF4F8", color: "#475467" }}>
-                <CreditCardRounded />
-              </Box>
-              <Typography variant="h6" sx={{ mt: 2 }}>
-                {data.debts.length === 0 ? "No debt accounts yet" : "No matching debt accounts"}
-              </Typography>
-              <Typography variant="body2" color="text.secondary" sx={{ mt: 0.6, maxWidth: 430 }}>
-                {data.debts.length === 0
-                  ? "Add a credit card, loan, or other balance to begin tracking your debt portfolio."
-                  : "Try a different search term or update the group and status filters."}
-              </Typography>
-              {data.debts.length === 0 && <Button startIcon={<AddRounded />} onClick={newDebt} sx={{ mt: 2 }}>Add debt</Button>}
-            </Stack>
-          </CardContent>
-        </Card>
-      ) : (
-        <Grid container spacing={2}>
-          {filteredDebts.map((debt) => {
-            const paid = isPaid(debt);
-            const kind = debtKindDetails[debt.kind];
-
-            return (
-              <Grid key={debt.id} size={{ xs: 12, md: 6, xl: 4 }}>
-                <Card sx={{ height: "100%", borderTop: `3px solid ${paid ? "#16A34A" : kind.color}` }}>
-                  <CardContent sx={{ p: 2.5, height: "100%", display: "flex", flexDirection: "column", "&:last-child": { pb: 2.5 } }}>
-                    <Stack direction="row" justifyContent="space-between" alignItems="flex-start" gap={1.5}>
-                      <Stack direction="row" alignItems="center" gap={1.3} sx={{ minWidth: 0 }}>
-                        <Box sx={{ width: 42, height: 42, borderRadius: 2.5, display: "grid", placeItems: "center", bgcolor: kind.background, color: kind.color, flexShrink: 0 }}>
-                          {kind.icon}
-                        </Box>
-                        <Box sx={{ minWidth: 0 }}>
-                          <Typography variant="h6" noWrap>{debt.name}</Typography>
-                          <Typography variant="body2" color="text.secondary">{kind.label}</Typography>
-                        </Box>
-                      </Stack>
-                      <Stack direction="row" flexShrink={0}>
-                        <Tooltip title="Edit debt"><IconButton size="small" onClick={() => edit(debt)} aria-label={`Edit ${debt.name}`}><EditRounded fontSize="small" /></IconButton></Tooltip>
-                        <Tooltip title="Delete debt"><IconButton size="small" onClick={() => void remove(debt.id)} aria-label={`Delete ${debt.name}`}><DeleteRounded fontSize="small" /></IconButton></Tooltip>
-                      </Stack>
-                    </Stack>
-
-                    <Stack direction="row" gap={0.8} flexWrap="wrap" sx={{ mt: 2 }}>
-                      <Chip size="small" label={debt.group} sx={{ textTransform: "capitalize" }} />
-                      <Chip size="small" variant="outlined" label={debt.category} />
-                      <Chip size="small" variant="outlined" label={debt.currency} />
-                      <Chip size="small" color={paid ? "success" : "warning"} label={paid ? "Paid off" : "Outstanding"} />
-                    </Stack>
-
-                    <Box sx={{ mt: 2.4 }}>
-                      <Typography variant="caption" color="text.secondary" fontWeight={700}>CURRENT BALANCE</Typography>
-                      <Typography variant="h5" sx={{ mt: 0.45, fontVariantNumeric: "tabular-nums" }}>
-                        {formatMoney(debt.balance, debt.currency)}
-                      </Typography>
-                    </Box>
-
-                    <Typography variant="body2" color="text.secondary" sx={{ mt: 1.4, minHeight: 40 }}>
-                      {debt.notes || "No notes added for this account."}
-                    </Typography>
-
-                    <Divider sx={{ my: 2 }} />
-                    <Button
-                      fullWidth
-                      variant={paid ? "text" : "outlined"}
-                      startIcon={paid ? <CheckCircleRounded /> : <PaymentsRounded />}
-                      disabled={paid}
-                      onClick={() => openPayment(debt)}
-                      sx={{ mt: "auto" }}
-                    >
-                      {paid ? "Paid in full" : "Make payment"}
-                    </Button>
-                  </CardContent>
-                </Card>
-              </Grid>
-            );
-          })}
-        </Grid>
-      )}
+          {filteredDebts.length === 0 ? (
+            <EmptyState
+              title={data.debts.length === 0 ? "No debt accounts yet" : "No matching accounts"}
+              message={
+                data.debts.length === 0
+                  ? "Add a credit card, loan or other balance to start tracking it."
+                  : "Try a different search term or clear the filters."
+              }
+              action={data.debts.length === 0 ? <Button startIcon={<AddOutlined />} onClick={newDebt}>New debt account</Button> : undefined}
+            />
+          ) : (
+            <TableContainer>
+              <Table size="small">
+                <TableHead>
+                  <TableRow>
+                    <TableCell>Account</TableCell>
+                    <TableCell sx={{ display: { xs: "none", md: "table-cell" } }}>Type</TableCell>
+                    <TableCell sx={{ display: { xs: "none", lg: "table-cell" } }}>Group</TableCell>
+                    <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>Status</TableCell>
+                    <TableCell align="right">Balance</TableCell>
+                    <TableCell align="right"><Box component="span" sx={visuallyHidden}>Actions</Box></TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {filteredDebts.map((debt) => {
+                    const paid = isPaid(debt);
+                    return (
+                      <TableRow key={debt.id} hover>
+                        <TableCell sx={{ maxWidth: { xs: 100, sm: 320 }, pr: { xs: 1, sm: 2 } }}>
+                          <Typography variant="body2" fontWeight={500} noWrap>{debt.name}</Typography>
+                          <Typography variant="caption" color="text.secondary" noWrap component="p">
+                            {debt.notes ? `${debt.category} · ${debt.notes}` : debt.category}
+                          </Typography>
+                        </TableCell>
+                        <TableCell sx={{ display: { xs: "none", md: "table-cell" }, color: "text.secondary" }}>{debtKindLabel[debt.kind]}</TableCell>
+                        <TableCell sx={{ display: { xs: "none", lg: "table-cell" }, color: "text.secondary" }}>{labelOf(debt.group)}</TableCell>
+                        <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>
+                          <StatusBadge label={paid ? "Paid off" : "Outstanding"} status={paid ? "positive" : "warning"} />
+                        </TableCell>
+                        <TableCell align="right" sx={{ fontWeight: 600, fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap", px: { xs: 1, sm: 2 } }}>
+                          {formatMoney(debt.balance, debt.currency)}
+                        </TableCell>
+                        <TableCell align="right" sx={{ whiteSpace: "nowrap", py: 0.5, pl: { xs: 0.5, sm: 2 }, pr: { xs: 1, sm: 2 } }}>
+                          <Button size="small" variant="outlined" disabled={paid} onClick={() => openPayment(debt)} sx={{ mr: 0.5, minWidth: 0, px: { xs: 1.25, sm: 1.75 } }}>
+                            Pay
+                          </Button>
+                          <Tooltip title="Edit">
+                            <IconButton size="small" onClick={() => edit(debt)} aria-label={`Edit ${debt.name}`}><EditOutlined fontSize="small" /></IconButton>
+                          </Tooltip>
+                          <Tooltip title="Delete">
+                            <IconButton size="small" onClick={() => void remove(debt.id)} aria-label={`Delete ${debt.name}`}><DeleteOutline fontSize="small" /></IconButton>
+                          </Tooltip>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          )}
+        </Panel>
+      </Stack>
 
       <Dialog open={open} onClose={() => setOpen(false)} fullWidth maxWidth="sm">
-        <DialogTitle>{editing ? "Edit debt account" : "Add debt account"}</DialogTitle>
+        <DialogTitle>{editing ? "Edit debt account" : "New debt account"}</DialogTitle>
         <Box component="form" onSubmit={form.handleSubmit(submit)}>
           <DialogContent dividers>
             <Grid container spacing={2} sx={{ mt: 0.25 }}>
@@ -452,24 +394,24 @@ export function DebtsPage() {
       </Dialog>
 
       <Dialog open={paymentDebt !== null} onClose={closePayment} fullWidth maxWidth="sm">
-        <DialogTitle>Make debt payment</DialogTitle>
+        <DialogTitle>Record payment</DialogTitle>
         <Box component="form" onSubmit={paymentForm.handleSubmit(submitPayment)}>
           <DialogContent dividers>
             <Stack spacing={2.2} sx={{ mt: 0.25 }}>
               {paymentError && <Alert severity="error">{paymentError}</Alert>}
-              <Box sx={{ p: 2.2, borderRadius: 3, bgcolor: "#F8FAFC", border: "1px solid", borderColor: "divider" }}>
+              <Box sx={{ p: 2, borderRadius: 1, bgcolor: "background.default", border: 1, borderColor: "divider" }}>
                 <Stack direction="row" justifyContent="space-between" alignItems="flex-start" gap={2}>
                   <Box>
-                    <Typography variant="caption" color="text.secondary" fontWeight={700}>PAYING</Typography>
+                    <Typography variant="overline" color="text.secondary" component="p">Paying</Typography>
                     <Typography variant="h6" sx={{ mt: 0.35 }}>{paymentDebt?.name}</Typography>
                     <Typography variant="body2" color="text.secondary" sx={{ mt: 0.35 }}>{paymentDebt?.category}</Typography>
                   </Box>
-                  {paymentDebt && <Chip variant="outlined" label={paymentDebt.currency} />}
+                  {paymentDebt && <StatusBadge label={paymentDebt.currency} status="neutral" />}
                 </Stack>
                 <Divider sx={{ my: 1.7 }} />
                 <Stack direction="row" justifyContent="space-between" alignItems="center">
                   <Typography variant="body2" color="text.secondary">Current balance</Typography>
-                  <Typography fontWeight={850} sx={{ fontVariantNumeric: "tabular-nums" }}>
+                  <Typography fontWeight={600} sx={{ fontVariantNumeric: "tabular-nums" }}>
                     {paymentDebt ? formatMoney(paymentDebt.balance, paymentDebt.currency) : ""}
                   </Typography>
                 </Stack>
@@ -499,6 +441,6 @@ export function DebtsPage() {
           </DialogActions>
         </Box>
       </Dialog>
-    </Stack>
+    </Box>
   );
 }

@@ -1,12 +1,11 @@
 import {
-  AccountBalanceWalletRounded,
-  AddCardRounded,
-  DashboardRounded,
-  LogoutRounded,
-  MenuRounded,
-  PaymentsRounded,
-  SettingsRounded,
-  ShieldRounded,
+  AccountBalanceOutlined,
+  CreditCardOutlined,
+  DashboardOutlined,
+  LogoutOutlined,
+  MenuOutlined,
+  ReceiptLongOutlined,
+  SettingsOutlined,
 } from "@mui/icons-material";
 import {
   AppBar,
@@ -29,79 +28,96 @@ import {
 import { useState } from "react";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { colors } from "../theme/theme";
 
-const drawerWidth = 252;
+const drawerWidth = 232;
 
 const links = [
-  { to: "/", label: "Overview", icon: <DashboardRounded fontSize="small" /> },
-  { to: "/transactions", label: "Transactions", icon: <PaymentsRounded fontSize="small" /> },
-  { to: "/debts", label: "Debt portfolio", icon: <AddCardRounded fontSize="small" /> },
-  { to: "/salary", label: "Income", icon: <AccountBalanceWalletRounded fontSize="small" /> },
-  { to: "/settings", label: "Settings", icon: <SettingsRounded fontSize="small" /> },
+  { to: "/", label: "Overview", icon: <DashboardOutlined fontSize="small" /> },
+  { to: "/transactions", label: "Transactions", icon: <ReceiptLongOutlined fontSize="small" /> },
+  { to: "/debts", label: "Debts", icon: <CreditCardOutlined fontSize="small" /> },
+  { to: "/salary", label: "Income", icon: <AccountBalanceOutlined fontSize="small" /> },
 ];
 
-function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
-  const { user } = useAuth();
-  const location = useLocation();
+const secondaryLinks = [
+  { to: "/settings", label: "Settings", icon: <SettingsOutlined fontSize="small" /> },
+];
 
+function isActive(pathname: string, to: string) {
+  return to === "/" ? pathname === "/" : pathname.startsWith(to);
+}
+
+export function BrandMark({ size = 30 }: { size?: number }) {
   return (
-    <Stack sx={{ height: "100%", bgcolor: "#0B1F33", color: "#fff" }}>
-      <Box sx={{ px: 2.5, py: 2.6 }}>
-        <Stack direction="row" alignItems="center" gap={1.4}>
-          <Box sx={{ width: 38, height: 38, borderRadius: 2.5, bgcolor: "#14B8A6", display: "grid", placeItems: "center", boxShadow: "0 8px 20px rgba(20,184,166,.25)" }}>
-            <AccountBalanceWalletRounded fontSize="small" />
-          </Box>
-          <Box>
-            <Typography fontWeight={800} lineHeight={1.1}>Finance Command</Typography>
-            <Typography variant="caption" sx={{ color: "rgba(255,255,255,.58)" }}>Personal financial control</Typography>
-          </Box>
-        </Stack>
-      </Box>
+    <Box
+      sx={{
+        width: size,
+        height: size,
+        borderRadius: 1,
+        bgcolor: colors.navy,
+        color: "#fff",
+        display: "grid",
+        placeItems: "center",
+        fontWeight: 700,
+        fontSize: size * 0.5,
+        flexShrink: 0,
+      }}
+    >
+      M
+    </Box>
+  );
+}
 
-      <Divider sx={{ borderColor: "rgba(255,255,255,.09)" }} />
+function NavList({ items, onNavigate }: { items: typeof links; onNavigate?: () => void }) {
+  const { pathname } = useLocation();
+  return (
+    <List disablePadding>
+      {items.map((link) => {
+        const active = isActive(pathname, link.to);
+        return (
+          <ListItemButton
+            key={link.to}
+            component={NavLink}
+            to={link.to}
+            onClick={onNavigate}
+            sx={{
+              mb: 0.25,
+              borderRadius: 1,
+              minHeight: 38,
+              px: 1.5,
+              color: active ? colors.navy : colors.textSecondary,
+              bgcolor: active ? colors.navyTint : "transparent",
+              "&:hover": { bgcolor: active ? colors.navyTint : colors.subtle, color: colors.text },
+            }}
+          >
+            <ListItemIcon sx={{ minWidth: 32, color: "inherit" }}>{link.icon}</ListItemIcon>
+            <ListItemText
+              primary={link.label}
+              slotProps={{ primary: { fontSize: 14, fontWeight: active ? 600 : 500 } }}
+            />
+          </ListItemButton>
+        );
+      })}
+    </List>
+  );
+}
 
-      <Box sx={{ px: 1.5, pt: 2, flex: 1 }}>
-        <Typography variant="overline" sx={{ px: 1.25, color: "rgba(255,255,255,.42)", fontWeight: 800, letterSpacing: ".08em" }}>
-          Workspace
+function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
+  return (
+    <Stack sx={{ height: "100%", bgcolor: colors.surface, borderRight: 1, borderColor: "divider" }}>
+      <Stack direction="row" alignItems="center" gap={1.25} sx={{ px: 2.25, height: 60 }}>
+        <BrandMark />
+        <Typography fontWeight={600} fontSize={15}>My Finance</Typography>
+      </Stack>
+      <Divider />
+      <Box sx={{ px: 1.25, pt: 2, flex: 1 }}>
+        <Typography variant="overline" color="text.disabled" sx={{ px: 1.5, display: "block", mb: 0.5 }}>
+          Accounts
         </Typography>
-        <List sx={{ mt: 0.8 }}>
-          {links.map((link) => {
-            const active = link.to === "/" ? location.pathname === "/" : location.pathname.startsWith(link.to);
-            return (
-              <ListItemButton
-                key={link.to}
-                component={NavLink}
-                to={link.to}
-                onClick={onNavigate}
-                sx={{
-                  mb: 0.5,
-                  borderRadius: 2.5,
-                  minHeight: 46,
-                  color: active ? "#FFFFFF" : "rgba(255,255,255,.68)",
-                  bgcolor: active ? "rgba(20,184,166,.16)" : "transparent",
-                  border: active ? "1px solid rgba(20,184,166,.22)" : "1px solid transparent",
-                  transition: "background-color .15s ease, color .15s ease, transform .15s ease",
-                  "&:hover": { bgcolor: "rgba(255,255,255,.07)", color: "#FFFFFF", transform: "translateX(2px)" },
-                }}
-              >
-                <ListItemIcon sx={{ minWidth: 38, color: "inherit" }}>{link.icon}</ListItemIcon>
-                <ListItemText primary={link.label} primaryTypographyProps={{ fontSize: 14, fontWeight: active ? 750 : 600 }} />
-              </ListItemButton>
-            );
-          })}
-        </List>
+        <NavList items={links} onNavigate={onNavigate} />
       </Box>
-
-      <Box sx={{ p: 2 }}>
-        <Box sx={{ p: 1.5, borderRadius: 3, bgcolor: "rgba(255,255,255,.055)", border: "1px solid rgba(255,255,255,.08)" }}>
-          <Stack direction="row" alignItems="center" gap={1.2}>
-            <ShieldRounded sx={{ color: "#5EEAD4", fontSize: 20 }} />
-            <Box sx={{ minWidth: 0 }}>
-              <Typography variant="caption" sx={{ display: "block", color: "rgba(255,255,255,.52)" }}>Secured with Firebase</Typography>
-              <Typography variant="body2" fontWeight={700} noWrap>{user?.email ?? "Private account"}</Typography>
-            </Box>
-          </Stack>
-        </Box>
+      <Box sx={{ px: 1.25, pb: 2 }}>
+        <NavList items={secondaryLinks} onNavigate={onNavigate} />
       </Box>
     </Stack>
   );
@@ -112,7 +128,7 @@ export function AppShell() {
   const theme = useTheme();
   const desktop = useMediaQuery(theme.breakpoints.up("lg"));
   const [mobileOpen, setMobileOpen] = useState(false);
-  const initials = (user?.email?.[0] ?? "F").toUpperCase();
+  const initials = (user?.email?.[0] ?? "U").toUpperCase();
 
   return (
     <Box sx={{ minHeight: "100vh", bgcolor: "background.default" }}>
@@ -121,35 +137,48 @@ export function AppShell() {
           <Sidebar />
         </Drawer>
       ) : (
-        <Drawer open={mobileOpen} onClose={() => setMobileOpen(false)} ModalProps={{ keepMounted: true }} sx={{ "& .MuiDrawer-paper": { width: drawerWidth, border: 0 } }}>
+        <Drawer
+          open={mobileOpen}
+          onClose={() => setMobileOpen(false)}
+          ModalProps={{ keepMounted: true }}
+          sx={{ "& .MuiDrawer-paper": { width: drawerWidth, border: 0 } }}
+        >
           <Sidebar onNavigate={() => setMobileOpen(false)} />
         </Drawer>
       )}
 
       <Box sx={{ ml: { lg: `${drawerWidth}px` } }}>
-        <AppBar position="sticky" elevation={0} color="inherit" sx={{ bgcolor: "rgba(255,255,255,.92)", backdropFilter: "blur(16px)", borderBottom: "1px solid", borderColor: "divider" }}>
-          <Toolbar sx={{ minHeight: 68 }}>
+        <AppBar
+          position="sticky"
+          elevation={0}
+          color="inherit"
+          sx={{ bgcolor: colors.surface, borderBottom: 1, borderColor: "divider" }}
+        >
+          <Toolbar sx={{ minHeight: { xs: 56, sm: 60 }, gap: 1 }}>
             {!desktop && (
-              <IconButton onClick={() => setMobileOpen(true)} sx={{ mr: 1 }}><MenuRounded /></IconButton>
+              <>
+                <IconButton onClick={() => setMobileOpen(true)} edge="start" aria-label="Open navigation">
+                  <MenuOutlined />
+                </IconButton>
+                <BrandMark size={26} />
+              </>
             )}
-            <Box sx={{ flex: 1 }}>
-              <Typography variant="body2" color="text.secondary" fontWeight={600}>Personal Finance</Typography>
-              <Typography fontWeight={800}>Financial Control Center</Typography>
-            </Box>
-            <Stack direction="row" alignItems="center" gap={1.2}>
-              <Box sx={{ display: { xs: "none", sm: "block" }, textAlign: "right" }}>
-                <Typography variant="body2" fontWeight={700}>Private workspace</Typography>
-                <Typography variant="caption" color="text.secondary">{user?.email}</Typography>
-              </Box>
-              <Avatar sx={{ width: 36, height: 36, bgcolor: "#E4F5F2", color: "#0F766E", fontWeight: 800 }}>{initials}</Avatar>
-              <Tooltip title="Sign out">
-                <IconButton onClick={() => void logout()} aria-label="Sign out"><LogoutRounded fontSize="small" /></IconButton>
-              </Tooltip>
-            </Stack>
+            <Box sx={{ flex: 1 }} />
+            <Typography variant="body2" color="text.secondary" sx={{ display: { xs: "none", sm: "block" } }}>
+              {user?.email}
+            </Typography>
+            <Avatar sx={{ width: 30, height: 30, fontSize: 13, fontWeight: 600, bgcolor: colors.navyTint, color: colors.navy }}>
+              {initials}
+            </Avatar>
+            <Tooltip title="Sign out">
+              <IconButton onClick={() => void logout()} aria-label="Sign out" size="small">
+                <LogoutOutlined fontSize="small" />
+              </IconButton>
+            </Tooltip>
           </Toolbar>
         </AppBar>
 
-        <Box component="main" sx={{ p: { xs: 2, sm: 3, xl: 4 }, maxWidth: 1600, mx: "auto" }}>
+        <Box component="main" sx={{ px: { xs: 2, sm: 3, xl: 4 }, py: { xs: 2.5, sm: 3.5 }, maxWidth: 1400, mx: "auto" }}>
           <Outlet />
         </Box>
       </Box>

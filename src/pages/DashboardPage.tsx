@@ -1,152 +1,90 @@
-import {
-  AccountBalanceRounded,
-  AddRounded,
-  ArrowDownwardRounded,
-  ArrowUpwardRounded,
-  CreditCardRounded,
-  SavingsRounded,
-  TrendingDownRounded,
-  TrendingUpRounded,
-  WalletRounded,
-} from "@mui/icons-material";
+import { AddOutlined } from "@mui/icons-material";
 import {
   Alert,
   Box,
   Button,
-  Card,
-  CardContent,
-  Chip,
-  Divider,
   Grid,
   Stack,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
   Typography,
 } from "@mui/material";
-import type { ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
-import {
-  Bar,
-  BarChart,
-  CartesianGrid,
-  Cell,
-  Legend,
-  Pie,
-  PieChart,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
+import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { LoadingScreen } from "../components/LoadingScreen";
-import { SummaryCard } from "../components/SummaryCard";
+import { Amount, EmptyState, PageHeader, Panel, StatCard, labelOf } from "../components/ui";
 import { useFinanceData } from "../hooks/useFinanceData";
-import { convertToBase, formatMoney } from "../lib/currency";
+import { convertToBase, formatDate, formatMoney } from "../lib/currency";
+import { colors } from "../theme/theme";
 import type { CurrencyCode } from "../types";
 
-const PIE_COLORS = ["#0F766E", "#2563EB", "#D97706", "#7C3AED", "#DC2626", "#0891B2", "#475467"];
-const CREDIT_COLOR = "#16A34A";
-const LIABILITY_COLOR = "#DC2626";
+function Row({ label, value, color, strong }: { label: string; value: string; color?: string; strong?: boolean }) {
+  return (
+    <Stack direction="row" justifyContent="space-between" alignItems="baseline" sx={{ py: 1.1 }}>
+      <Typography variant="body2" color="text.secondary">{label}</Typography>
+      <Typography
+        variant="body2"
+        sx={{ fontWeight: strong ? 600 : 500, color: color ?? "text.primary", fontVariantNumeric: "tabular-nums" }}
+      >
+        {value}
+      </Typography>
+    </Stack>
+  );
+}
 
-function AccountGroupCard({
-  label,
-  icon,
-  color,
-  tint,
+function GroupSummary({
+  title,
   credits,
-  debts,
   outstanding,
+  debts,
   base,
 }: {
-  label: string;
-  icon: ReactNode;
-  color: string;
-  tint: string;
+  title: string;
   credits: number;
-  debts: number;
   outstanding: number;
+  debts: number;
   base: CurrencyCode;
 }) {
-  const positive = outstanding >= 0;
-  const liabilityTone = debts <= 0 ? "text.secondary" : debts > credits ? "error.main" : "warning.main";
   const total = credits + debts;
-  const liabilityShare = total > 0 ? (debts / total) * 100 : 0;
-  const pieData =
-    total > 0
-      ? [
-          { name: "Credits", value: credits, color: CREDIT_COLOR },
-          { name: "Liabilities", value: debts, color: LIABILITY_COLOR },
-        ]
-      : [{ name: "No data", value: 1, color: "#E4E7EC" }];
+  const share = total > 0 ? (debts / total) * 100 : 0;
 
   return (
-    <Card sx={{ height: "100%", overflow: "hidden", borderTop: `4px solid ${color}`, background: `linear-gradient(168deg, ${tint} 0%, #FFFFFF 58%)` }}>
-      <CardContent sx={{ p: 3, "&:last-child": { pb: 3 } }}>
-        <Stack direction="row" alignItems="center" gap={1.4}>
-          <Box sx={{ width: 44, height: 44, borderRadius: 2.8, display: "grid", placeItems: "center", bgcolor: "#fff", color, flexShrink: 0, boxShadow: "0 6px 16px rgba(16,24,40,.08)" }}>
-            {icon}
-          </Box>
-          <Box sx={{ minWidth: 0, flex: 1 }}>
-            <Typography variant="h6">{label}</Typography>
-            <Typography variant="caption" color="text.secondary">Portfolio group</Typography>
-          </Box>
-          <Chip
-            size="small"
-            label={positive ? "Healthy" : "Attention"}
-            sx={{
-              bgcolor: positive ? "#EAF8F0" : "#FFF5E7",
-              color: positive ? "#15803D" : "#B45309",
-              fontWeight: 750,
-            }}
-          />
-        </Stack>
+    <Panel title={title} subtitle="Account group">
+      <Typography variant="overline" color="text.secondary" component="p">Cash balance</Typography>
+      <Typography
+        sx={{ fontSize: "1.75rem", fontWeight: 600, fontVariantNumeric: "tabular-nums", color: outstanding >= 0 ? colors.text : colors.negative }}
+      >
+        {formatMoney(outstanding, base)}
+      </Typography>
 
-        <Grid container spacing={2} sx={{ mt: 2.2 }}>
-          <Grid size={6}>
-            <Typography variant="caption" color="text.secondary" fontWeight={700} letterSpacing=".03em">
-              OUTSTANDING BALANCE
-            </Typography>
-            <Typography variant="h4" sx={{ mt: 0.3, fontVariantNumeric: "tabular-nums", color: positive ? "success.main" : "error.main" }} noWrap>
-              {formatMoney(outstanding, base)}
-            </Typography>
-          </Grid>
-          <Grid size={6}>
-            <Typography variant="caption" color="text.secondary" fontWeight={700} letterSpacing=".03em">
-              OUTSTANDING LIABILITY
-            </Typography>
-            <Typography variant="h4" sx={{ mt: 0.3, fontVariantNumeric: "tabular-nums", color: liabilityTone }} noWrap>
-              {formatMoney(debts, base)}
-            </Typography>
-          </Grid>
-        </Grid>
+      <Box sx={{ mt: 1.5, borderTop: 1, borderColor: "divider" }}>
+        <Row label="Total income" value={formatMoney(credits, base)} />
+        <Box sx={{ borderTop: 1, borderColor: "divider" }}>
+          <Row label="Outstanding liabilities" value={formatMoney(debts, base)} color={debts > 0 ? colors.warning : undefined} />
+        </Box>
+      </Box>
 
-        <Stack direction="row" alignItems="center" gap={2.5} sx={{ mt: 2.8 }}>
-          <Box sx={{ width: 104, height: 104, position: "relative", flexShrink: 0 }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie data={pieData} dataKey="value" nameKey="name" innerRadius={32} outerRadius={50} paddingAngle={total > 0 ? 4 : 0} stroke="none">
-                  {pieData.map((entry, index) => <Cell key={index} fill={entry.color} />)}
-                </Pie>
-              </PieChart>
-            </ResponsiveContainer>
-            <Box sx={{ position: "absolute", inset: 0, display: "grid", placeItems: "center" }}>
-              <Typography variant="body2" fontWeight={850}>{liabilityShare.toFixed(0)}%</Typography>
-            </Box>
-          </Box>
-          <Stack spacing={1.1} sx={{ flex: 1, minWidth: 0 }}>
-            <Stack direction="row" alignItems="center" gap={1}>
-              <Box sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: CREDIT_COLOR, flexShrink: 0 }} />
-              <Typography variant="body2" color="text.secondary" sx={{ flex: 1 }}>Credits</Typography>
-              <Typography variant="body2" fontWeight={800}>{formatMoney(credits, base)}</Typography>
-            </Stack>
-            <Stack direction="row" alignItems="center" gap={1}>
-              <Box sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: LIABILITY_COLOR, flexShrink: 0 }} />
-              <Typography variant="body2" color="text.secondary" sx={{ flex: 1 }}>Liabilities</Typography>
-              <Typography variant="body2" fontWeight={800}>{formatMoney(debts, base)}</Typography>
-            </Stack>
-            <Typography variant="caption" color="text.secondary">Share of liabilities in this group's total</Typography>
-          </Stack>
+      <Box sx={{ mt: 1.5 }}>
+        <Stack direction="row" justifyContent="space-between" sx={{ mb: 0.75 }}>
+          <Typography variant="caption" color="text.secondary">Liabilities as share of income + liabilities</Typography>
+          <Typography variant="caption" fontWeight={600}>{share.toFixed(0)}%</Typography>
         </Stack>
-      </CardContent>
-    </Card>
+        <Box
+          role="meter"
+          aria-valuenow={Math.round(share)}
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-label={`${title} liability share`}
+          sx={{ height: 6, borderRadius: 3, bgcolor: "#E8ECF1", overflow: "hidden" }}
+        >
+          <Box sx={{ width: `${share}%`, height: "100%", bgcolor: colors.seriesLiability, borderRadius: 3 }} />
+        </Box>
+      </Box>
+    </Panel>
   );
 }
 
@@ -158,161 +96,178 @@ export function DashboardPage() {
   if (data.error) return <Alert severity="error">{data.error}</Alert>;
   if (!data.fx) return <Alert severity="warning">Exchange rates are unavailable.</Alert>;
 
+  const fx = data.fx;
   const base = data.settings.baseCurrency;
-  const expenseByCategory = Object.entries(
+  const { summary } = data;
+
+  const spendByCategory = Object.entries(
     data.entries
       .filter((x) => x.type === "debit")
       .reduce<Record<string, number>>((acc, item) => {
-        acc[item.category] = (acc[item.category] ?? 0) + convertToBase(item.amount, item.currency, data.fx!);
+        acc[item.category] = (acc[item.category] ?? 0) + convertToBase(item.amount, item.currency, fx);
         return acc;
       }, {}),
   )
     .map(([name, value]) => ({ name, value }))
-    .sort((a, b) => b.value - a.value)
-    .slice(0, 7);
+    .sort((a, b) => b.value - a.value);
+  const topSpend = spendByCategory.slice(0, 6);
+  const otherSpend = spendByCategory.slice(6).reduce((sum, x) => sum + x.value, 0);
+  if (otherSpend > 0) topSpend.push({ name: "Other", value: otherSpend });
+  const maxSpend = Math.max(...topSpend.map((x) => x.value), 1);
 
   const groupChart = [
-    { name: "Primary", Balance: data.summary.primaryOutstanding, Liability: data.summary.primaryDebts },
-    { name: "Secondary", Balance: data.summary.secondaryOutstanding, Liability: data.summary.secondaryDebts },
+    { name: "Primary", Balance: summary.primaryOutstanding, Liabilities: summary.primaryDebts },
+    { name: "Secondary", Balance: summary.secondaryOutstanding, Liabilities: summary.secondaryDebts },
   ];
 
-  const recent = [...data.entries].slice(0, 6);
-  const totalOutflow = data.summary.expenseDebits + data.summary.debtBalances;
-  const coverage = data.summary.credits > 0 ? Math.max(0, Math.min(100, (data.summary.credits / Math.max(totalOutflow, 1)) * 100)) : 0;
-  const isPositive = data.summary.outstanding >= 0;
+  const recent = data.entries.slice(0, 8);
+  const money = (v: number) => formatMoney(v, base);
+  const compact = (v: number) =>
+    new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 1 }).format(v);
 
   return (
-    <Stack spacing={3.2}>
-      <Stack direction={{ xs: "column", md: "row" }} justifyContent="space-between" alignItems={{ md: "center" }} gap={2}>
-        <Box>
-          <Typography variant="h4">Overview</Typography>
-          <Typography color="text.secondary" sx={{ mt: 0.6 }}>
-            What you currently have across your primary and secondary accounts.
-          </Typography>
-        </Box>
-        <Stack direction="row" gap={1.2} flexWrap="wrap">
-          <Chip variant="outlined" label={`FX ${data.fx.date}`} sx={{ bgcolor: "#fff" }} />
-          <Button startIcon={<AddRounded />} variant="contained" onClick={() => navigate("/transactions")}>Add transaction</Button>
-        </Stack>
-      </Stack>
-
-      <Grid container spacing={2.2}>
-        <Grid size={{ xs: 12, md: 6 }}>
-          <AccountGroupCard
-            label="Primary"
-            icon={<WalletRounded />}
-            color="#0F766E"
-            tint="#E4F5F2"
-            credits={data.summary.primaryCredits}
-            debts={data.summary.primaryDebts}
-            outstanding={data.summary.primaryOutstanding}
-            base={base}
-          />
-        </Grid>
-        <Grid size={{ xs: 12, md: 6 }}>
-          <AccountGroupCard
-            label="Secondary"
-            icon={<AccountBalanceRounded />}
-            color="#2563EB"
-            tint="#EAF1FF"
-            credits={data.summary.secondaryCredits}
-            debts={data.summary.secondaryDebts}
-            outstanding={data.summary.secondaryOutstanding}
-            base={base}
-          />
-        </Grid>
-      </Grid>
+    <Box>
+      <PageHeader
+        title="Overview"
+        description={`All figures in ${base} · exchange rates as of ${fx.date}`}
+        actions={
+          <Button variant="contained" startIcon={<AddOutlined />} onClick={() => navigate("/transactions")}>
+            New transaction
+          </Button>
+        }
+      />
 
       <Grid container spacing={2}>
-        <Grid size={{ xs: 12, sm: 6, xl: 3 }}><SummaryCard label="Total credits" value={formatMoney(data.summary.credits, base)} caption="Primary + secondary income" icon={<SavingsRounded />} tone="positive" /></Grid>
-        <Grid size={{ xs: 12, sm: 6, xl: 3 }}><SummaryCard label="Total liabilities" value={formatMoney(data.summary.debtBalances, base)} caption={`${data.debts.length} tracked account${data.debts.length === 1 ? "" : "s"}`} icon={<CreditCardRounded />} tone="warning" /></Grid>
-        <Grid size={{ xs: 12, sm: 6, xl: 3 }}><SummaryCard label="Total outstanding" value={formatMoney(data.summary.outstanding, base)} caption="Credits − debits (incl. debt payments)" icon={isPositive ? <TrendingUpRounded /> : <TrendingDownRounded />} tone={isPositive ? "positive" : "negative"} /></Grid>
-        <Grid size={{ xs: 12, sm: 6, xl: 3 }}><SummaryCard label="Coverage" value={`${coverage.toFixed(0)}%`} caption="Credits vs total obligations" icon={<TrendingUpRounded />} tone={isPositive ? "positive" : "neutral"} /></Grid>
-      </Grid>
-
-      <Grid container spacing={2.2}>
-        <Grid size={{ xs: 12, xl: 7 }}>
-          <Card sx={{ height: "100%" }}>
-            <CardContent sx={{ p: 3 }}>
-              <Stack direction="row" justifyContent="space-between" alignItems="flex-start" mb={2.5}>
-                <Box><Typography variant="h6">Balance vs liability by group</Typography><Typography variant="body2" color="text.secondary" sx={{ mt: 0.4 }}>Outstanding balance and outstanding liability, side by side</Typography></Box>
-                <Chip size="small" label={base} variant="outlined" />
-              </Stack>
-              <Box sx={{ height: 280 }}>
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={groupChart} barGap={10}>
-                    <CartesianGrid stroke="#EEF1F4" vertical={false} />
-                    <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: "#667085", fontSize: 12 }} />
-                    <YAxis axisLine={false} tickLine={false} tick={{ fill: "#98A2B3", fontSize: 11 }} />
-                    <Tooltip formatter={(value) => formatMoney(Number(value ?? 0), base)} cursor={{ fill: "#F8FAFC" }} contentStyle={{ borderRadius: 12, border: "1px solid #E4E7EC", boxShadow: "0 10px 24px rgba(16,24,40,.08)" }} />
-                    <Legend iconType="circle" />
-                    <Bar dataKey="Balance" fill={CREDIT_COLOR} radius={[7, 7, 0, 0]} maxBarSize={54} />
-                    <Bar dataKey="Liability" fill={LIABILITY_COLOR} radius={[7, 7, 0, 0]} maxBarSize={54} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </Box>
-            </CardContent>
-          </Card>
+        <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
+          <StatCard
+            label="Cash balance"
+            value={money(summary.outstanding)}
+            caption="Income minus expenses"
+            tone={summary.outstanding >= 0 ? "default" : "negative"}
+          />
+        </Grid>
+        <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
+          <StatCard label="Total income" value={money(summary.credits)} caption="All recorded credits" />
+        </Grid>
+        <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
+          <StatCard label="Total expenses" value={money(summary.expenseDebits)} caption="Including debt payments" />
+        </Grid>
+        <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
+          <StatCard
+            label="Outstanding liabilities"
+            value={money(summary.debtBalances)}
+            caption={`${data.debts.length} debt account${data.debts.length === 1 ? "" : "s"}`}
+          />
         </Grid>
 
-        <Grid size={{ xs: 12, xl: 5 }}>
-          <Card sx={{ height: "100%" }}>
-            <CardContent sx={{ p: 3 }}>
-              <Typography variant="h6">Expense composition</Typography>
-              <Typography variant="body2" color="text.secondary" sx={{ mt: 0.4 }}>Top categories by recorded spend</Typography>
-              <Box sx={{ height: 220, mt: 1 }}>
-                {expenseByCategory.length ? (
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie data={expenseByCategory} dataKey="value" nameKey="name" innerRadius={62} outerRadius={88} paddingAngle={3} stroke="none">
-                        {expenseByCategory.map((_, index) => <Cell key={index} fill={PIE_COLORS[index % PIE_COLORS.length]} />)}
-                      </Pie>
-                      <Tooltip formatter={(value) => formatMoney(Number(value ?? 0), base)} contentStyle={{ borderRadius: 12, border: "1px solid #E4E7EC" }} />
-                    </PieChart>
-                  </ResponsiveContainer>
-                ) : <Box sx={{ height: "100%", display: "grid", placeItems: "center" }}><Typography color="text.secondary">No expense data yet</Typography></Box>}
-              </Box>
-              <Stack spacing={1.15}>
-                {expenseByCategory.slice(0, 4).map((item, index) => (
-                  <Stack key={item.name} direction="row" justifyContent="space-between" alignItems="center">
-                    <Stack direction="row" alignItems="center" gap={1}><Box sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: PIE_COLORS[index] }} /><Typography variant="body2" color="text.secondary">{item.name}</Typography></Stack>
-                    <Typography variant="body2" fontWeight={750}>{formatMoney(item.value, base)}</Typography>
-                  </Stack>
+        <Grid size={{ xs: 12, md: 6 }}>
+          <GroupSummary
+            title="Primary"
+            credits={summary.primaryCredits}
+            outstanding={summary.primaryOutstanding}
+            debts={summary.primaryDebts}
+            base={base}
+          />
+        </Grid>
+        <Grid size={{ xs: 12, md: 6 }}>
+          <GroupSummary
+            title="Secondary"
+            credits={summary.secondaryCredits}
+            outstanding={summary.secondaryOutstanding}
+            debts={summary.secondaryDebts}
+            base={base}
+          />
+        </Grid>
+
+        <Grid size={{ xs: 12, lg: 7 }}>
+          <Panel title="Balance and liabilities by group" subtitle={`Cash balance against outstanding debt, ${base}`}>
+            <Box sx={{ height: 260 }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={groupChart} barGap={2} barCategoryGap="30%" margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+                  <CartesianGrid stroke="#EDF0F4" vertical={false} />
+                  <XAxis dataKey="name" axisLine={{ stroke: colors.border }} tickLine={false} tick={{ fill: colors.textSecondary, fontSize: 12 }} />
+                  <YAxis axisLine={false} tickLine={false} width={48} tick={{ fill: colors.textMuted, fontSize: 11 }} tickFormatter={compact} />
+                  <Tooltip
+                    formatter={(value) => money(Number(value ?? 0))}
+                    cursor={{ fill: colors.subtle }}
+                    contentStyle={{ borderRadius: 6, border: `1px solid ${colors.border}`, fontSize: 13, boxShadow: "0 4px 12px rgba(16,24,40,.08)" }}
+                  />
+                  <Legend iconType="square" iconSize={10} wrapperStyle={{ fontSize: 12, color: colors.textSecondary }} />
+                  <Bar dataKey="Balance" isAnimationActive={false} fill={colors.seriesBalance} radius={[4, 4, 0, 0]} maxBarSize={40} />
+                  <Bar dataKey="Liabilities" isAnimationActive={false} fill={colors.seriesLiability} radius={[4, 4, 0, 0]} maxBarSize={40} />
+                </BarChart>
+              </ResponsiveContainer>
+            </Box>
+          </Panel>
+        </Grid>
+
+        <Grid size={{ xs: 12, lg: 5 }}>
+          <Panel title="Spending by category" subtitle={`Total recorded expenses, ${base}`}>
+            {topSpend.length === 0 ? (
+              <EmptyState title="No expenses yet" message="Expenses will appear here once you record them." />
+            ) : (
+              <Stack spacing={1.5}>
+                {topSpend.map((item) => (
+                  <Box key={item.name}>
+                    <Stack direction="row" justifyContent="space-between" sx={{ mb: 0.5 }}>
+                      <Typography variant="body2" noWrap sx={{ pr: 2 }}>{item.name}</Typography>
+                      <Typography variant="body2" fontWeight={600} sx={{ fontVariantNumeric: "tabular-nums" }}>{money(item.value)}</Typography>
+                    </Stack>
+                    <Box sx={{ height: 8, bgcolor: "#EDF0F4", borderRadius: 1 }}>
+                      <Box
+                        title={`${item.name}: ${money(item.value)}`}
+                        sx={{ width: `${(item.value / maxSpend) * 100}%`, minWidth: 4, height: "100%", bgcolor: colors.seriesBalance, borderRadius: 1 }}
+                      />
+                    </Box>
+                  </Box>
                 ))}
               </Stack>
-            </CardContent>
-          </Card>
+            )}
+          </Panel>
+        </Grid>
+
+        <Grid size={12}>
+          <Panel
+            title="Recent activity"
+            flush
+            action={<Button size="small" onClick={() => navigate("/transactions")}>View all</Button>}
+          >
+            {recent.length === 0 ? (
+              <EmptyState title="No transactions yet" message="Record your first credit or debit to get started." />
+            ) : (
+              <TableContainer>
+                <Table size="small">
+                  <TableHead>
+                    <TableRow>
+                      <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>Date</TableCell>
+                      <TableCell>Description</TableCell>
+                      <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>Category</TableCell>
+                      <TableCell sx={{ display: { xs: "none", md: "table-cell" } }}>Group</TableCell>
+                      <TableCell align="right">Amount</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {recent.map((item) => (
+                      <TableRow key={item.id} hover>
+                        <TableCell sx={{ display: { xs: "none", sm: "table-cell" }, whiteSpace: "nowrap", color: "text.secondary" }}>{formatDate(item.date)}</TableCell>
+                        <TableCell sx={{ maxWidth: { xs: 190, sm: 280 } }}>
+                          <Typography variant="body2" noWrap>{item.description}</Typography>
+                          <Typography variant="caption" color="text.secondary" sx={{ display: { sm: "none" } }}>{formatDate(item.date)}</Typography>
+                        </TableCell>
+                        <TableCell sx={{ display: { xs: "none", sm: "table-cell" }, color: "text.secondary" }}>{item.category}</TableCell>
+                        <TableCell sx={{ display: { xs: "none", md: "table-cell" }, color: "text.secondary" }}>{labelOf(item.group)}</TableCell>
+                        <TableCell align="right">
+                          <Amount value={formatMoney(item.amount, item.currency)} positive={item.type === "credit"} />
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            )}
+          </Panel>
         </Grid>
       </Grid>
-
-      <Card>
-        <CardContent sx={{ p: 0 }}>
-          <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ p: 3, pb: 2 }}>
-            <Box><Typography variant="h6">Recent activity</Typography><Typography variant="body2" color="text.secondary">Latest recorded credits and debits</Typography></Box>
-            <Button size="small" onClick={() => navigate("/transactions")}>View all</Button>
-          </Stack>
-          <Divider />
-          {recent.length === 0 ? (
-            <Box sx={{ p: 4, textAlign: "center" }}><Typography color="text.secondary">No transactions recorded yet.</Typography></Box>
-          ) : recent.map((item, index) => (
-            <Box key={item.id}>
-              <Stack
-                direction="row"
-                alignItems="center"
-                gap={1.5}
-                sx={{ px: 3, py: 1.65, transition: "background-color .15s ease", "&:hover": { bgcolor: "#FBFCFD" } }}
-              >
-                <Box sx={{ width: 38, height: 38, borderRadius: 2.3, display: "grid", placeItems: "center", bgcolor: item.type === "credit" ? "#EAF8F0" : "#FEF1F1", color: item.type === "credit" ? "#15803D" : "#B42318" }}>
-                  {item.type === "credit" ? <ArrowUpwardRounded fontSize="small" /> : <ArrowDownwardRounded fontSize="small" />}
-                </Box>
-                <Box sx={{ flex: 1, minWidth: 0 }}><Typography fontWeight={700} noWrap>{item.description}</Typography><Typography variant="caption" color="text.secondary">{item.category} · {item.group} · {item.date}</Typography></Box>
-                <Typography fontWeight={800} color={item.type === "credit" ? "success.main" : "text.primary"}>{item.type === "credit" ? "+" : "−"}{formatMoney(item.amount, item.currency)}</Typography>
-              </Stack>
-              {index < recent.length - 1 && <Divider sx={{ ml: 8.8 }} />}
-            </Box>
-          ))}
-        </CardContent>
-      </Card>
-    </Stack>
+    </Box>
   );
 }
