@@ -5,6 +5,9 @@ export function toUserMessage(error: unknown): string {
     if (normalized.includes("auth/invalid-credential")) {
       return "Email or password is incorrect.";
     }
+    if (normalized.includes("auth/invalid-email")) {
+      return "That email address doesn't look right.";
+    }
     if (normalized.includes("auth/too-many-requests")) {
       return "Too many login attempts. Please try again later.";
     }

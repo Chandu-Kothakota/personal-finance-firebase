@@ -6,6 +6,7 @@ import { BrowserRouter } from "react-router-dom";
 import App from "./App";
 import { ErrorBoundary } from "./ErrorBoundary";
 import { AuthProvider } from "./context/AuthContext";
+import { FeedbackProvider } from "./context/FeedbackProvider";
 import { appTheme } from "./theme/theme";
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
@@ -15,7 +16,9 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
         <CssBaseline />
         <BrowserRouter>
           <AuthProvider>
-            <App />
+            <FeedbackProvider>
+              <App />
+            </FeedbackProvider>
           </AuthProvider>
         </BrowserRouter>
       </ThemeProvider>

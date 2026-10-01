@@ -47,3 +47,7 @@ export async function saveSalaryProfile(
 ): Promise<void> {
   await api(id ? "PUT" : "POST", id ? `salary-profiles/${id}` : "salary-profiles", profile);
 }
+
+export async function deleteSalaryProfile(id: string): Promise<void> {
+  await api("DELETE", `salary-profiles/${id}`);
+}

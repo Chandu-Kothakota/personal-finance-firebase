@@ -6,6 +6,7 @@ import {
   Card,
   IconButton,
   InputAdornment,
+  Link,
   Stack,
   TextField,
   Typography,
@@ -14,16 +15,19 @@ import { useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { BrandMark } from "../components/AppShell";
 import { useAuth } from "../context/AuthContext";
+import { useDocumentTitle } from "../hooks/useDocumentTitle";
 import { toUserMessage } from "../lib/errors";
 
 export function LoginPage() {
-  const { login } = useAuth();
+  useDocumentTitle("Sign in");
+  const { login, resetPassword } = useAuth();
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
+  const [info, setInfo] = useState("");
 
   async function submit(event: FormEvent) {
     event.preventDefault();
@@ -36,6 +40,21 @@ export function LoginPage() {
       setError(toUserMessage(err));
     } finally {
       setSubmitting(false);
+    }
+  }
+
+  async function forgot() {
+    setError("");
+    setInfo("");
+    if (!email.trim()) {
+      setError("Enter your email above first, then choose “Forgot password?” again.");
+      return;
+    }
+    try {
+      await resetPassword(email);
+      setInfo(`If an account exists for ${email.trim()}, a reset link is on its way.`);
+    } catch (err) {
+      setError(toUserMessage(err));
     }
   }
 
@@ -54,6 +73,7 @@ export function LoginPage() {
           </Typography>
 
           {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+          {info && <Alert severity="success" sx={{ mb: 2 }}>{info}</Alert>}
 
           <Box component="form" onSubmit={submit}>
             <Stack spacing={2}>
@@ -92,6 +112,11 @@ export function LoginPage() {
                   },
                 }}
               />
+              <Box sx={{ textAlign: "right", mt: "-6px !important" }}>
+                <Link component="button" type="button" variant="body2" underline="hover" onClick={() => void forgot()}>
+                  Forgot password?
+                </Link>
+              </Box>
               <Button type="submit" variant="contained" size="large" disabled={submitting} fullWidth>
                 {submitting ? "Signing in…" : "Sign in"}
               </Button>

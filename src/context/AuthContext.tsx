@@ -1,5 +1,6 @@
 import {
   onAuthStateChanged,
+  sendPasswordResetEmail,
   signInWithEmailAndPassword,
   signOut,
   type User,
@@ -19,6 +20,7 @@ type AuthContextValue = {
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
+  resetPassword: (email: string) => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -43,6 +45,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       },
       logout: async () => {
         await signOut(auth);
+      },
+      resetPassword: async (email) => {
+        await sendPasswordResetEmail(auth, email.trim());
       },
     }),
     [user, loading],

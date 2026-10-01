@@ -1,6 +1,6 @@
 import { Navigate, Route, Routes } from "react-router-dom";
 import { AppShell } from "./components/AppShell";
-import { LoadingScreen } from "./components/LoadingScreen";
+import { Box, CircularProgress } from "@mui/material";
 import { useAuth } from "./context/AuthContext";
 import { FinanceDataProvider } from "./context/FinanceDataProvider";
 import { DashboardPage } from "./pages/DashboardPage";
@@ -10,10 +10,18 @@ import { SalaryPage } from "./pages/SalaryPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import { TransactionsPage } from "./pages/TransactionsPage";
 
+function SessionSplash() {
+  return (
+    <Box sx={{ minHeight: "100vh", display: "grid", placeItems: "center" }} role="status" aria-label="Checking your session">
+      <CircularProgress size={28} />
+    </Box>
+  );
+}
+
 function ProtectedLayout() {
   const { user, loading } = useAuth();
 
-  if (loading) return <LoadingScreen label="Checking your session…" />;
+  if (loading) return <SessionSplash />;
   if (!user) return <Navigate to="/login" replace />;
 
   return (
@@ -32,7 +40,7 @@ export default function App() {
         path="/login"
         element={
           loading ? (
-            <LoadingScreen />
+            <SessionSplash />
           ) : user ? (
             <Navigate to="/" replace />
           ) : (
