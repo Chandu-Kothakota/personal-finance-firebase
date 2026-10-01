@@ -2,6 +2,7 @@ import { Navigate, Route, Routes } from "react-router-dom";
 import { AppShell } from "./components/AppShell";
 import { LoadingScreen } from "./components/LoadingScreen";
 import { useAuth } from "./context/AuthContext";
+import { FinanceDataProvider } from "./context/FinanceDataProvider";
 import { DashboardPage } from "./pages/DashboardPage";
 import { DebtsPage } from "./pages/DebtsPage";
 import { LoginPage } from "./pages/LoginPage";
@@ -15,7 +16,11 @@ function ProtectedLayout() {
   if (loading) return <LoadingScreen label="Checking your session…" />;
   if (!user) return <Navigate to="/login" replace />;
 
-  return <AppShell />;
+  return (
+    <FinanceDataProvider>
+      <AppShell />
+    </FinanceDataProvider>
+  );
 }
 
 export default function App() {
