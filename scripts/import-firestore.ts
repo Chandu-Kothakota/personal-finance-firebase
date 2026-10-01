@@ -36,7 +36,7 @@ async function main() {
   console.log(dryRun ? "DRY RUN — nothing will be written.\n" : "Importing…\n");
   await sql.transaction([sql`SELECT 1`]); // fail fast on a bad DATABASE_URL
 
-  const totals = { users: 0, entries: 0, debts: 0, salaryProfiles: 0, settings: 0 };
+  const totals = { users: 0, entries: 0, debts: 0, salaryProfiles: 0 };
   const userRefs = await firestore.collection("users").listDocuments();
 
   for (const userRef of userRefs) {
@@ -49,20 +49,14 @@ async function main() {
       userRef.collection("settings").doc("preferences").get(),
     ]);
 
+    const p = (prefs.data() ?? {}) as DocumentData;
     const stmts = [
-      sql`INSERT INTO users (uid, email, last_login_at)
-          VALUES (${uid}, ${text(userDoc.data()?.email)}, ${ts(userDoc.data()?.lastLoginAt) ?? new Date().toISOString()})
-          ON CONFLICT (uid) DO UPDATE SET email = EXCLUDED.email`,
+      sql`INSERT INTO users (uid, email, base_currency, display_name, last_login_at)
+          VALUES (${uid}, ${text(userDoc.data()?.email)}, ${text(p.baseCurrency, "USD")}, ${text(p.displayName)},
+                  ${ts(userDoc.data()?.lastLoginAt) ?? new Date().toISOString()})
+          ON CONFLICT (uid) DO UPDATE SET email = EXCLUDED.email, base_currency = EXCLUDED.base_currency,
+            display_name = EXCLUDED.display_name`,
     ];
-
-    if (prefs.exists) {
-      const p = prefs.data() as DocumentData;
-      stmts.push(sql`
-        INSERT INTO settings (uid, base_currency, display_name)
-        VALUES (${uid}, ${text(p.baseCurrency, "USD")}, ${text(p.displayName)})
-        ON CONFLICT (uid) DO UPDATE SET base_currency = EXCLUDED.base_currency,
-          display_name = EXCLUDED.display_name`);
-    }
 
     for (const d of entries.docs) {
       const e = d.data();
@@ -113,7 +107,6 @@ async function main() {
     totals.entries += entries.size;
     totals.debts += debts.size;
     totals.salaryProfiles += profiles.size;
-    totals.settings += prefs.exists ? 1 : 0;
     console.log(
       `  ${uid}: ${entries.size} entries, ${debts.size} debts, ${profiles.size} salary profiles`,
     );
@@ -126,8 +119,7 @@ async function main() {
       SELECT (SELECT count(*) FROM users)::int AS users,
              (SELECT count(*) FROM entries)::int AS entries,
              (SELECT count(*) FROM debts)::int AS debts,
-             (SELECT count(*) FROM salary_profiles)::int AS salary_profiles,
-             (SELECT count(*) FROM settings)::int AS settings`;
+             (SELECT count(*) FROM salary_profiles)::int AS salary_profiles`;
     console.log("Neon row counts: ", c);
   }
 }

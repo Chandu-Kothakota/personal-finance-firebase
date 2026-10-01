@@ -65,5 +65,5 @@ export function payDays(body: Body): number[] | null {
   ) {
     throw new HttpError(400, `"payDays" is invalid.`);
   }
-  return value as number[];
+  return [...new Set(value as number[])];
 }

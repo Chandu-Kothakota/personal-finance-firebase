@@ -1,84 +1,38 @@
-import {
-  addMonths,
-  format,
-  isAfter,
-  isBefore,
-  isEqual,
-  parseISO,
-  setDate,
-  startOfMonth,
-} from "date-fns";
 import { sql } from "./db";
 
-type ProfileRow = {
-  id: string;
-  name: string;
-  ledger_group: string;
-  amount: string;
-  currency: string;
-  effective_date: string;
-  pay_days: number[] | null;
-  pay_day: number | null;
-};
-
-function payDaysOf(profile: Pick<ProfileRow, "pay_days" | "pay_day">): number[] {
-  const configured = profile.pay_days?.length
-    ? profile.pay_days
-    : profile.pay_day !== null
-      ? [profile.pay_day]
-      : [];
-
-  return configured
-    .filter(
-      (day, index, days) =>
-        Number.isInteger(day) && day >= 1 && day <= 31 && days.indexOf(day) === index,
-    )
-    .slice(0, 2);
-}
-
 /**
- * Creates any missing salary credits up to `today` (yyyy-MM-dd, the client's local date).
- * Idempotent: ids and occurrence keys are deterministic and inserts skip conflicts.
+ * Statement that creates any missing salary credits up to `today` (yyyy-MM-dd, the client's
+ * local date). Runs entirely in Postgres so it can ride along in the same round trip as the
+ * reads. Idempotent: ids/occurrence keys are deterministic and conflicts are skipped.
+ * Pay days beyond a month's end use that month's last day; at most two distinct days apply.
  */
-export async function materializeSalaryCredits(uid: string, todayIso: string) {
-  const profiles = (await sql`
-    SELECT id, name, ledger_group, amount, currency,
-           to_char(effective_date, 'YYYY-MM-DD') AS effective_date, pay_days, pay_day
-    FROM salary_profiles WHERE uid = ${uid} AND active
-  `) as ProfileRow[];
-
-  const today = parseISO(todayIso);
-  const inserts: ReturnType<typeof sql>[] = [];
-
-  for (const profile of profiles) {
-    const effective = parseISO(profile.effective_date);
-    const payDays = payDaysOf(profile);
-    let cursor = startOfMonth(effective);
-
-    while (!isAfter(cursor, today)) {
-      const maxDay = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 0).getDate();
-
-      payDays.forEach((payDay, index) => {
-        const payDate = setDate(cursor, Math.min(payDay, maxDay));
-        const validStart = isAfter(payDate, effective) || isEqual(payDate, effective);
-        const validEnd = isBefore(payDate, today) || isEqual(payDate, today);
-        if (!validStart || !validEnd) return;
-
-        const date = format(payDate, "yyyy-MM-dd");
-        const key = `${profile.id}:${date}${index === 0 ? "" : `:${index + 1}`}`;
-        const id = `salary_${profile.id}_${format(payDate, "yyyyMMdd")}${index === 0 ? "" : `_${index + 1}`}`;
-
-        inserts.push(sql`
-          INSERT INTO entries (id, uid, type, ledger_group, category, description, amount,
-                               currency, date, source, salary_profile_id, salary_occurrence_key)
-          VALUES (${id}, ${uid}, 'credit', ${profile.ledger_group}, 'Salary', ${profile.name},
-                  ${profile.amount}, ${profile.currency}, ${date}, 'salary', ${profile.id}, ${key})
-          ON CONFLICT DO NOTHING
-        `);
-      });
-      cursor = addMonths(cursor, 1);
-    }
-  }
-
-  if (inserts.length > 0) await sql.transaction(inserts);
+export function materializeSalaryCreditsStatement(uid: string, today: string) {
+  return sql`
+    INSERT INTO entries (id, uid, type, ledger_group, category, description, amount, currency,
+                         date, source, salary_profile_id, salary_occurrence_key)
+    SELECT 'salary_' || p.id || '_' || to_char(pay.d, 'YYYYMMDD') || pd.sfx,
+           p.uid, 'credit', p.ledger_group, 'Salary', p.name, p.amount, p.currency,
+           pay.d, 'salary', p.id,
+           p.id || ':' || to_char(pay.d, 'YYYY-MM-DD') || replace(pd.sfx, '_', ':')
+    FROM salary_profiles p
+    CROSS JOIN LATERAL (
+      SELECT CASE WHEN cardinality(p.pay_days) > 0 THEN p.pay_days ELSE ARRAY[p.pay_day] END AS a
+    ) arr
+    CROSS JOIN LATERAL (
+      SELECT x.day, CASE WHEN x.idx = 1 THEN '' ELSE '_' || x.idx END AS sfx
+      FROM unnest(arr.a) WITH ORDINALITY AS x(day, idx)
+      WHERE x.day BETWEEN 1 AND 31 AND x.idx <= 2 AND (x.idx = 1 OR x.day <> arr.a[1])
+    ) pd
+    CROSS JOIN LATERAL generate_series(
+      date_trunc('month', p.effective_date::timestamp),
+      date_trunc('month', ${today}::date::timestamp),
+      interval '1 month'
+    ) AS m(ms)
+    CROSS JOIN LATERAL (
+      SELECT m.ms::date
+             + (least(pd.day, extract(day FROM m.ms + interval '1 month' - interval '1 day')::int) - 1) AS d
+    ) pay
+    WHERE p.uid = ${uid} AND p.active
+      AND pay.d >= p.effective_date AND pay.d <= ${today}::date
+    ON CONFLICT DO NOTHING`;
 }

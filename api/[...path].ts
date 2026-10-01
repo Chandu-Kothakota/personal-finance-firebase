@@ -2,7 +2,7 @@ import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { randomUUID } from "node:crypto";
 import { authenticate, HttpError } from "./_lib/auth";
 import { sql } from "./_lib/db";
-import { materializeSalaryCredits } from "./_lib/salary";
+import { materializeSalaryCreditsStatement } from "./_lib/salary";
 import { asBody, currency, group, isoDate, num, oneOf, payDays, str } from "./_lib/validate";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -63,13 +63,17 @@ async function route(req: VercelRequest, uid: string, email: string | null) {
   // GET /api/data — everything the app needs, in one round trip.
   if (resource === "data" && method === "GET") {
     const today = isoDate(req.query.today, "today");
-    await sql`
-      INSERT INTO users (uid, email) VALUES (${uid}, ${email})
-      ON CONFLICT (uid) DO UPDATE SET email = EXCLUDED.email, last_login_at = now()`;
-    await materializeSalaryCredits(uid, today);
+    const defaultBase = process.env.VITE_BASE_CURRENCY ?? "USD";
 
-    const [settings, entries, debts, profiles] = await sql.transaction([
-      sql`SELECT base_currency, display_name FROM settings WHERE uid = ${uid}`,
+    // One round trip, one transaction: touch the user row (only when stale), create missing
+    // salary credits, then read everything.
+    const [, , users, entries, debts, profiles] = await sql.transaction([
+      sql`INSERT INTO users (uid, email, base_currency) VALUES (${uid}, ${email}, ${defaultBase})
+          ON CONFLICT (uid) DO UPDATE SET email = EXCLUDED.email, last_login_at = now()
+          WHERE users.last_login_at < now() - interval '1 hour'
+             OR users.email IS DISTINCT FROM EXCLUDED.email`,
+      materializeSalaryCreditsStatement(uid, today),
+      sql`SELECT base_currency, display_name FROM users WHERE uid = ${uid}`,
       sql`SELECT id, type, ledger_group, category, description, amount, currency,
                  to_char(date, 'YYYY-MM-DD') AS date, source, debt_id, salary_profile_id,
                  salary_occurrence_key, created_at, updated_at
@@ -83,8 +87,8 @@ async function route(req: VercelRequest, uid: string, email: string | null) {
 
     return {
       settings: {
-        baseCurrency: settings[0]?.base_currency ?? process.env.VITE_BASE_CURRENCY ?? "USD",
-        displayName: settings[0]?.display_name ?? undefined,
+        baseCurrency: users[0].base_currency,
+        displayName: users[0].display_name ?? undefined,
       },
       entries: entries.map(toEntry),
       debts: debts.map(toDebt),
@@ -97,9 +101,8 @@ async function route(req: VercelRequest, uid: string, email: string | null) {
     const base = oneOf(body, "baseCurrency", ["USD", "INR", "CAD", "EUR", "GBP"]);
     const displayName = str(body, "displayName", { optional: true, max: 100 });
     await sql`
-      INSERT INTO users (uid, email) VALUES (${uid}, ${email}) ON CONFLICT (uid) DO NOTHING`;
-    await sql`
-      INSERT INTO settings (uid, base_currency, display_name) VALUES (${uid}, ${base}, ${displayName})
+      INSERT INTO users (uid, email, base_currency, display_name)
+      VALUES (${uid}, ${email}, ${base}, ${displayName})
       ON CONFLICT (uid) DO UPDATE SET base_currency = EXCLUDED.base_currency,
         display_name = EXCLUDED.display_name`;
     return { ok: true };
